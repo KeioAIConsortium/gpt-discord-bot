@@ -17,7 +17,7 @@ class Assistant(commands.Cog):
         assistants = await list_assistants()
         rendered = ""
         for assistant in assistants:
-            rendered += assistant.render() + "\n"
+            rendered += assistant.render()
         await int.response.send_message(rendered)
 
 

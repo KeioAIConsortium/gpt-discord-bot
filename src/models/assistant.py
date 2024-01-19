@@ -51,7 +51,7 @@ class Assistant:
 
     def render(self) -> str:
         """Render the Assistant object to string to display in discord"""
-        return f"[{self.id}] {self.name} - {self.description}"
+        return f"[{self.id}] {self.name} - {self.description}" + "\n"
 
     @classmethod
     def from_api_output(cls, api_output: OpenAIAssistant) -> None:
