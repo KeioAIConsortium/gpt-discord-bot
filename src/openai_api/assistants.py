@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from openai import AsyncOpenAI
-from src.base import Assistant
+from src.models.assistant import Assistant
 
 logger = logging.getLogger(__name__)
 client = AsyncOpenAI()
