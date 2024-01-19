@@ -5,6 +5,7 @@ import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
+
 from src.constants import ACTIVATE_BUILD_THREAD_PREFIX
 from src.discord_cogs._utils import should_block
 from src.models.assistant import AssistantCreate

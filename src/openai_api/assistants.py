@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from openai import AsyncOpenAI
+
 from src.models.assistant import Assistant, AssistantCreate
 
 logger = logging.getLogger(__name__)

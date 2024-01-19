@@ -3,6 +3,7 @@ from typing import Optional
 
 import discord
 from discord import Message as DiscordMessage
+
 from src.constants import ALLOWED_SERVER_IDS, MAX_CHARS_PER_REPLY_MSG
 
 logger = logging.getLogger(__name__)

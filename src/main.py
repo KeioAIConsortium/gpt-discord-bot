@@ -3,6 +3,7 @@ from pathlib import Path
 
 import discord
 from discord.ext import commands
+
 from src.constants import BOT_INVITE_URL, DISCORD_BOT_TOKEN
 
 logging.basicConfig(
