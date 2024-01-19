@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 
 from openai import AsyncOpenAI
-from src.models.assistant import Assistant
+from src.models.assistant import Assistant, AssistantCreate
 
 logger = logging.getLogger(__name__)
 client = AsyncOpenAI()
 
 
-async def create_assistant(cfg: Assistant) -> Assistant:
+async def create_assistant(cfg: AssistantCreate) -> Assistant:
     responce = await client.beta.assistants.create(**cfg.input_to_api_create())
     return Assistant.from_api_output(responce)
 
@@ -43,4 +43,3 @@ async def delete_assistant(id: str) -> None:
             return
     except ValueError as e:
         logger.exception(e)
-
