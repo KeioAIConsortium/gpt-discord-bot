@@ -1,6 +1,10 @@
+import logging
 from dataclasses import asdict, dataclass
 
 from openai.types.beta.assistant import Assistant as OpenAIAssistant
+from src.constants import DEFAULT_MODEL
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -18,6 +22,10 @@ class Assistant:
     def input_to_api_create(self) -> dict[str, str]:
         """Convert the Assistant object to dict for input to API create"""
         tmp = asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
+        # model is required for create
+        if "model" not in tmp:
+            logger.warning("model is required for create. Use default model.")
+            tmp["model"] = DEFAULT_MODEL
         # id and created_at are not needed for create
         remove_keys = ["id", "created_at"]
         for key in remove_keys:
