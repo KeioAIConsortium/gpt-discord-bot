@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -8,7 +7,7 @@ from src.openai_api.assistants import list_assistants
 
 
 class Assistant(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(name="list")
@@ -17,7 +16,7 @@ class Assistant(commands.Cog):
         assistants = await list_assistants()
         rendered = ""
         for assistant in assistants:
-            rendered += assistant.render() + "\n"
+            rendered += assistant.render()
         await int.response.send_message(rendered)
 
 
