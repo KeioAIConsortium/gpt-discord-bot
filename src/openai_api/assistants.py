@@ -23,7 +23,7 @@ async def list_assistants(limit: int = 20, order: str = "desc") -> list[Assistan
 
 
 async def get_assistant(id: str) -> Assistant:
-    responce = await client.beta.assistants.retrieve(id=id)
+    responce = await client.beta.assistants.retrieve(assistant_id=id)
     return Assistant.from_api_output(responce)
 
 
