@@ -23,6 +23,7 @@ async def list_assistants(limit: int = 20, order: str = "desc") -> list[Assistan
 
 
 async def get_assistant(id: str) -> Assistant:
+    """Get an assistant. If the assistant is not found, raise openai.NotFoundError."""
     responce = await client.beta.assistants.retrieve(assistant_id=id)
     return Assistant.from_api_output(responce)
 
@@ -33,6 +34,7 @@ async def update_assistant(cfg: Assistant) -> Assistant:
 
 
 async def delete_assistant(id: str) -> None:
+    """Delete an assistant. If the assistant is not found, raise openai.NotFoundError."""
     responce = await client.beta.assistants.delete(assistant_id=id)
     if responce.deleted:
         logger.info(f"Deleted assistant {responce.id}")
