@@ -65,7 +65,7 @@ class Assistant(commands.Cog):
                 )
             )
 
-            return await thread.send(f"Created assistant `{created.id}`")
+            return await thread.send(f"Created assistant `{created.id}` ")
 
         except Exception as e:
             logger.exception(e)
