@@ -21,7 +21,7 @@ class Assistant(commands.Cog):
     async def build(self, int: discord.Interaction, name: str):
         """Create an assistant"""
         try:
-            # only support creating thread in text channel
+            # only support creating assistant in text channel
             if not isinstance(int.channel, discord.TextChannel):
                 return
 
