@@ -33,13 +33,10 @@ async def update_assistant(cfg: Assistant) -> Assistant:
 
 
 async def delete_assistant(id: str) -> None:
-    try:
-        responce = await client.beta.assistants.delete(assistant_id=id)
-        if responce.deleted:
-            logger.info(f"Deleted assistant {responce.id}")
-            return
-        else:
-            logger.info(f"Failed to delete assistant {responce.id}")
-            return
-    except ValueError as e:
-        logger.exception(e)
+    responce = await client.beta.assistants.delete(assistant_id=id)
+    if responce.deleted:
+        logger.info(f"Deleted assistant {responce.id}")
+        return
+    else:
+        logger.info(f"Failed to delete assistant {responce.id}")
+        return
