@@ -78,7 +78,72 @@ class Assistant(commands.Cog):
         rendered = ""
         for assistant in assistants:
             rendered += assistant.render()
-        await int.response.send_message(rendered)
+    @app_commands.command(name="delete")
+    async def delete(self, int: discord.Interaction, assistant_id: str):
+        """Delete the specified assistant"""
+        await int.response.defer()  # defer the response to avoid timeout during openai_api call
+        try:
+            # only support deleting assistant in text channel
+            if not isinstance(int.channel, discord.TextChannel):
+                return
+
+            # block servers not in allow list
+            if should_block(guild=int.guild):
+                return
+
+            assistant = await get_assistant(assistant_id)
+
+            embed = discord.Embed(
+                title=f"Assistant {assistant.name}",
+                description=f"Description: {assistant.description}",
+                color=discord.Color.red(),
+            )
+            view = DeleteConfirmView(assistant=assistant)
+            await int.followup.send(
+                content=f"Are you sure you want to delete assistant `{assistant.id}`?",
+                embed=embed,
+                view=view,
+            )
+
+            user = int.user
+            # TODO: check if the user has the permission to delete
+
+            logger.info(f"Delete command by {user}")
+
+        except Exception as e:
+            if isinstance(e, openai.NotFoundError):
+                if e.status_code == 404:
+                    await int.followup.send(
+                        f"Failed to delete assistant. No assistant found with id `{assistant_id}`."
+                    )
+            else:
+                logger.exception(e)
+                await int.followup.send(f"Failed to delete assistant. {str(e)}")
+
+
+class DeleteConfirmView(discord.ui.View):
+    def __init__(self, assistant: Assistant):
+        super().__init__()
+        self.assistant = assistant
+
+    @discord.ui.button(label="Delete", style=discord.ButtonStyle.red)
+    async def delete(self, int: discord.Interaction, button: discord.ui.Button):
+        await delete_assistant(self.assistant.id)
+        await int.response.send_message(
+            f"Deleted assistant {self.assistant.name} by {int.user.mention}"
+        )
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        await int.followup.edit_message(message_id=int.message.id, view=self)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.grey)
+    async def cancel(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message("Cancelled deleting assistant", ephemeral=True)
+        self.stop()
+        # delete the original message
+        await int.followup.delete_message(int.message.id)
 
 
 async def setup(bot):
