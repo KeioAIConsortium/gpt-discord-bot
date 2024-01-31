@@ -4,6 +4,7 @@ import logging
 from dataclasses import asdict, dataclass
 
 from openai.types.beta.assistant import Assistant as OpenAIAssistant
+
 from src.constants import DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)

@@ -7,6 +7,7 @@ from discord import Message as DiscordMessage
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View
+
 from src.constants import ACTIVATE_CHAT_THREAD_PREFIX
 from src.discord_cogs._utils import (
     is_last_message_stale,

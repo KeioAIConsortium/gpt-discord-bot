@@ -3,6 +3,7 @@ import logging
 
 from openai import AsyncOpenAI
 from openai.types.beta.thread import Thread as OpenAIThread
+
 from src.models.api_responce import ResponceData, ResponceStatus
 from src.models.message import Message, MessageCreate
 
