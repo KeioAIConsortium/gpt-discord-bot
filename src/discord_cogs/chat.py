@@ -142,7 +142,7 @@ class Chat(commands.Cog):
                     assistant_id=openai_assistant_id,
                     new_message=MessageCreate.from_discord_message(
                         thread_id=openai_thread_id,
-                        author_name=message.author.name,
+                        author_name=message.author.display_name,
                         message=message.content,
                     ),
                 )
