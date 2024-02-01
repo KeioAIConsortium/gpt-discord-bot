@@ -3,12 +3,18 @@ from __future__ import annotations
 import logging
 
 import discord
+import openai
 from discord import app_commands
 from discord.ext import commands
 from src.constants import ACTIVATE_BUILD_THREAD_PREFIX
 from src.discord_cogs._utils import should_block
 from src.models.assistant import AssistantCreate
-from src.openai_api.assistants import create_assistant, list_assistants
+from src.openai_api.assistants import (
+    create_assistant,
+    delete_assistant,
+    get_assistant,
+    list_assistants,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +84,7 @@ class Assistant(commands.Cog):
         rendered = ""
         for assistant in assistants:
             rendered += assistant.render()
+
     @app_commands.command(name="delete")
     async def delete(self, int: discord.Interaction, assistant_id: str):
         """Delete the specified assistant"""
