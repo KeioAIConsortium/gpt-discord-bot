@@ -84,7 +84,11 @@ class Assistant(commands.Cog):
         """Update an assistant"""
         try:
             # only support updating assistant in text channel
-            if not isinstance(int.channel, discord.TextChannel):
+            if isinstance(int.channel, discord.TextChannel):
+                thread = None
+            elif isinstance(int.channel, discord.Thread) and int.channel.name.startswith(ACTIVATE_BUILD_THREAD_PREFIX):
+                thread = int.channel
+            else:
                 return
 
             # block servers not in allow list
@@ -105,13 +109,14 @@ class Assistant(commands.Cog):
             assistant = await get_assistant(assistant_id)
 
             # create the thread
-            response = await int.original_response()
-            thread = await response.create_thread(
-                name=f"{ACTIVATE_BUILD_THREAD_PREFIX} - {assistant.name} - {user.name[:20]}",
-                slowmode_delay=1,
-                reason="gpt-bot",
-                auto_archive_duration=60,
-            )
+            if thread is None:
+                response = await int.original_response()
+                thread = await response.create_thread(
+                    name=f"{ACTIVATE_BUILD_THREAD_PREFIX} - {assistant.name} - {user.name[:20]}",
+                    slowmode_delay=1,
+                    reason="gpt-bot",
+                    auto_archive_duration=60,
+                )
 
             # Description
             await thread.send("What is the new description of your assistant?")
