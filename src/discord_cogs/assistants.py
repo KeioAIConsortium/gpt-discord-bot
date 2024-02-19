@@ -7,16 +7,15 @@ import openai
 from discord import app_commands
 from discord.ext import commands
 
-from src.constants import ACTIVATE_BUILD_THREAD_PREFIX
+from src.constants import ACTIVATE_BUILD_THREAD_PREFIX, MAX_ASSISTANT_LIST
 from src.discord_cogs._utils import should_block
 from src.models.assistant import AssistantCreate
-from src.models.assistant import Assistant as AssistantUpdate
 from src.openai_api.assistants import (
     create_assistant,
-    update_assistant,
     delete_assistant,
     get_assistant,
     list_assistants,
+    update_assistant,
 )
 
 logger = logging.getLogger(__name__)
@@ -117,17 +116,17 @@ class Assistant(commands.Cog):
             # Description
             await thread.send("What is the new description of your assistant?")
             description = await self.bot.wait_for("message", check=lambda m: m.author == user)
-            if description.content != '.':
+            if description.content != ".":
                 assistant.description = description.content
 
             # Instructions
             await thread.send("What are the new instructions for your assistant?")
             instructions = await self.bot.wait_for("message", check=lambda m: m.author == user)
-            if instructions.content != '.':
+            if instructions.content != ".":
                 assistant.instructions = instructions.content
 
             # TODO: add tools and file_ids
-            
+
             updated = await update_assistant(assistant)
 
             return await thread.send(f"Updated assistant `{updated.id}` ")
@@ -137,10 +136,10 @@ class Assistant(commands.Cog):
             await int.response.send_message(f"Failed to start chat {str(e)}", ephemeral=True)
 
     @app_commands.command(name="list")
-    async def list(self, int: discord.Interaction):
-        """List all available assistants"""
+    async def list(self, int: discord.Interaction, max: int = MAX_ASSISTANT_LIST):
+        """List available assistants with optional limit (default MAX_ASSISTANT_LIST)"""
         await int.response.defer()
-        assistants = await list_assistants()
+        assistants = await list_assistants(limit=max)
         header = "Available Assistants 🤖 `[assistant_id] name - description`\n"
         rendered = "".join([f"```{assistant.render()}```" for assistant in assistants])
         await int.followup.send(content=f"{header}{rendered}")

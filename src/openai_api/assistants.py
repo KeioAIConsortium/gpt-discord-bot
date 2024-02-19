@@ -15,7 +15,7 @@ async def create_assistant(cfg: AssistantCreate) -> Assistant:
     return Assistant.from_api_output(responce)
 
 
-async def list_assistants(limit: int = 20, order: str = "desc") -> list[Assistant]:
+async def list_assistants(limit, order: str = "desc") -> list[Assistant]:
     responce = await client.beta.assistants.list(limit=limit, order=order)
     assistants = []
     for d in responce.data:

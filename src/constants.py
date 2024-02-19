@@ -25,3 +25,5 @@ INACTIVATE_CHAT_THREAD_PREFIX = "💬❌"
 ACTIVATE_BUILD_THREAD_PREFIX = "🔨✅"
 INACTIVATE_BUILD_THREAD_PREFIX = "🔨❌"
 MAX_CHARS_PER_REPLY_MSG = 1500  # discord has a 2k limit, we just break message into 1.5k
+
+MAX_ASSISTANT_LIST = 20  # must be between 1 and 100
