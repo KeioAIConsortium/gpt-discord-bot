@@ -7,7 +7,7 @@ import openai
 from discord import app_commands
 from discord.ext import commands
 
-from src.constants import ACTIVATE_BUILD_THREAD_PREFIX
+from src.constants import ACTIVATE_BUILD_THREAD_PREFIX, MAX_ASSISTANT_LIST
 from src.discord_cogs._utils import should_block
 from src.models.assistant import AssistantCreate
 from src.openai_api.assistants import (
@@ -136,10 +136,10 @@ class Assistant(commands.Cog):
             await int.response.send_message(f"Failed to start chat {str(e)}", ephemeral=True)
 
     @app_commands.command(name="list")
-    async def list(self, int: discord.Interaction):
-        """List all available assistants"""
+    async def list(self, int: discord.Interaction, max: int = MAX_ASSISTANT_LIST):
+        """List available assistants with optional limit (default MAX_ASSISTANT_LIST)"""
         await int.response.defer()
-        assistants = await list_assistants()
+        assistants = await list_assistants(limit=max)
         header = "Available Assistants 🤖 `[assistant_id] name - description`\n"
         rendered = "".join([f"```{assistant.render()}```" for assistant in assistants])
         await int.followup.send(content=f"{header}{rendered}")
