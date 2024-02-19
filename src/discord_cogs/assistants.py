@@ -139,10 +139,11 @@ class Assistant(commands.Cog):
     @app_commands.command(name="list")
     async def list(self, int: discord.Interaction):
         """List all available assistants"""
+        await int.response.defer()
         assistants = await list_assistants()
-        rendered = ""
-        for assistant in assistants:
-            rendered += assistant.render()
+        header = "Available Assistants 🤖 `[assistant_id] name - description`\n"
+        rendered = "".join([f"```{assistant.render()}```" for assistant in assistants])
+        await int.followup.send(content=f"{header}{rendered}")
 
     @app_commands.command(name="delete")
     async def delete(self, int: discord.Interaction, assistant_id: str):
