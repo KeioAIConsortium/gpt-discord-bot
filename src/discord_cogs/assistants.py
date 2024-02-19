@@ -10,8 +10,10 @@ from discord.ext import commands
 from src.constants import ACTIVATE_BUILD_THREAD_PREFIX
 from src.discord_cogs._utils import should_block
 from src.models.assistant import AssistantCreate
+from src.models.assistant import Assistant as AssistantUpdate
 from src.openai_api.assistants import (
     create_assistant,
+    update_assistant,
     delete_assistant,
     get_assistant,
     list_assistants,
@@ -73,6 +75,62 @@ class Assistant(commands.Cog):
             )
 
             return await thread.send(f"Created assistant `{created.id}` ")
+
+        except Exception as e:
+            logger.exception(e)
+            await int.response.send_message(f"Failed to start chat {str(e)}", ephemeral=True)
+
+    @app_commands.command(name="update")
+    async def update(self, int: discord.Interaction, assistant_id: str):
+        """Update an assistant"""
+        try:
+            # only support updating assistant in text channel
+            if not isinstance(int.channel, discord.TextChannel):
+                return
+
+            # block servers not in allow list
+            if should_block(guild=int.guild):
+                return
+
+            user = int.user
+            logger.info(f"Update command by {user}")
+
+            # Create embed
+            embed = discord.Embed(
+                description=f"<@{user.id}> wants to update an assistant! 🤖💬",
+                color=discord.Color.blue(),
+            )
+            await int.response.send_message(embed=embed)
+
+            # The current assistant
+            assistant = await get_assistant(assistant_id)
+
+            # create the thread
+            response = await int.original_response()
+            thread = await response.create_thread(
+                name=f"{ACTIVATE_BUILD_THREAD_PREFIX} - {assistant.name} - {user.name[:20]}",
+                slowmode_delay=1,
+                reason="gpt-bot",
+                auto_archive_duration=60,
+            )
+
+            # Description
+            await thread.send("What is the new description of your assistant?")
+            description = await self.bot.wait_for("message", check=lambda m: m.author == user)
+            if description.content != '.':
+                assistant.description = description.content
+
+            # Instructions
+            await thread.send("What are the new instructions for your assistant?")
+            instructions = await self.bot.wait_for("message", check=lambda m: m.author == user)
+            if instructions.content != '.':
+                assistant.instructions = instructions.content
+
+            # TODO: add tools and file_ids
+            
+            updated = await update_assistant(assistant)
+
+            return await thread.send(f"Updated assistant `{updated.id}` ")
 
         except Exception as e:
             logger.exception(e)

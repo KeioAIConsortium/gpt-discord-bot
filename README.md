@@ -10,11 +10,11 @@ It is designed to facilitate interactive learning and engagement through group c
 
 - `/build` initiates an assistant creation process, with a `name` argument. Users can define the assistant's name, description, and instructions in a guided, interactive thread.
 
+- `/update` initiates an assistant update process, with a `assistant_id` argument. Users can redefine the assistant's description and instructions.
+
 - `/chat` starts a public thread where you can select an assistant for the chat. The assistant will generate a reply for every user message in the thread.
 
 - Each Discord thread is linked to an [OpenAI thread](https://platform.openai.com/docs/api-reference/threads) and an [OpenAI assistant](https://platform.openai.com/docs/api-reference/assistants). Context window management is handled inside the API.
-
-- Each Discord thread is linked to an [OpenAI thread](https://platform.openai.com/docs/api-reference/threads) and an [OpenAI assistant](https://platform.openai.com/docs/api-reference/assistants). Context window management is handled by OpenAI.
 
 - Supports multi-user interaction. The bot can recognize individual users in a thread and generate responses accordingly.
 
@@ -58,6 +58,8 @@ It is designed to facilitate interactive learning and engagement through group c
 The bot operates via slash commands. Type `/` in a text channel to view available commands.
 
 - **`/build`**: Initiates an assistant creation process. Users can define the assistant's name, description, and instructions in a guided, interactive thread.
+
+- **`/update`**: Initiates an assistant update process. Users can redefine the assistant's description and instructions in a guided, interactive thread. If users do not want to change any of these, they can specify '.' to indicate no change.
 
 - **`/list`**: Displays a list of the 20 newest assistants.
 
