@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import logging
 
 import discord
@@ -64,12 +66,26 @@ class Assistant(commands.Cog):
             await thread.send("What are the instructions for your assistant?")
             instructions = await self.bot.wait_for("message", check=lambda m: m.author == user)
 
+            # Tools
+            tools = []
+            await thread.send("What are the tools for your assistant?")
+            retrieval_view = TrueFalseView()
+            await thread.send("Files", view=retrieval_view)
+            try:
+                retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
+                if retrieval_value:
+                    tools.append({"type": "retrieval"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+
+
             # TODO: add tools and file_ids
             created = await create_assistant(
                 AssistantCreate(
                     name=name,
                     description=description.content,
                     instructions=instructions.content,
+                    tools=tools,
                 )
             )
 
@@ -216,6 +232,28 @@ class DeleteConfirmView(discord.ui.View):
         # delete the original message
         await int.followup.delete_message(int.message.id)
 
+
+class TrueFalseView(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        self.value = asyncio.Future()
+    @discord.ui.button(label="Enable", style=discord.ButtonStyle.green)
+    async def true(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message("Enabled", ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(True)
+
+    @discord.ui.button(label="Disable", style=discord.ButtonStyle.red)
+    async def false(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message("Disabled", ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(False)
 
 async def setup(bot):
     await bot.add_cog(Assistant(bot))

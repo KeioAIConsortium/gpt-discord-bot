@@ -21,11 +21,11 @@ class MessageCreate:
 
     @classmethod
     def from_discord_message(
-        self, thread_id: str, author_name: str, message: str
+        self, thread_id: str, author_name: str, message: str, file_ids: list[str] | None = None
     ) -> MessageCreate:
         """Create an instance from the discord message"""
         content = f"{author_name}: {message}"
-        return self(thread_id=thread_id, content=content)
+        return self(thread_id=thread_id, content=content, file_ids=file_ids)
 
     def input_to_api_create(self) -> dict[str, str]:
         """Convert the MessageCreate object to dict for input to API create"""
