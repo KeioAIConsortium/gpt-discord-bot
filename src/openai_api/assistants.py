@@ -11,22 +11,22 @@ client = AsyncOpenAI()
 
 
 async def create_assistant(cfg: AssistantCreate) -> Assistant:
-    responce = await client.beta.assistants.create(**cfg.input_to_api_create())
-    return Assistant.from_api_output(responce)
+    response = await client.beta.assistants.create(**cfg.input_to_api_create())
+    return Assistant.from_api_output(response)
 
 
-async def list_assistants(limit, order: str = "desc") -> list[Assistant]:
-    responce = await client.beta.assistants.list(limit=limit, order=order)
+async def list_assistants(limit: int = "20", order: str = "desc") -> list[Assistant]:
+    response = await client.beta.assistants.list(limit=limit, order=order)
     assistants = []
-    for d in responce.data:
+    for d in response.data:
         assistants.append(Assistant.from_api_output(d))
     return assistants
 
 
 async def get_assistant(id: str) -> Assistant:
     """Get an assistant. If the assistant is not found, raise openai.NotFoundError."""
-    responce = await client.beta.assistants.retrieve(assistant_id=id)
-    return Assistant.from_api_output(responce)
+    response = await client.beta.assistants.retrieve(assistant_id=id)
+    return Assistant.from_api_output(response)
 
 
 async def update_assistant(cfg: Assistant) -> Assistant:
@@ -36,10 +36,10 @@ async def update_assistant(cfg: Assistant) -> Assistant:
 
 async def delete_assistant(id: str) -> None:
     """Delete an assistant. If the assistant is not found, raise openai.NotFoundError."""
-    responce = await client.beta.assistants.delete(assistant_id=id)
-    if responce.deleted:
-        logger.info(f"Deleted assistant {responce.id}")
+    response = await client.beta.assistants.delete(assistant_id=id)
+    if response.deleted:
+        logger.info(f"Deleted assistant {response.id}")
         return
     else:
-        logger.info(f"Failed to delete assistant {responce.id}")
+        logger.info(f"Failed to delete assistant {response.id}")
         return
