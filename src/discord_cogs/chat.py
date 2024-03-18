@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Select, View
 
-from src.constants import ACTIVATE_CHAT_THREAD_PREFIX
+from src.constants import ACTIVATE_CHAT_THREAD_PREFIX, MAX_ASSISTANT_LIST
 from src.discord_cogs._utils import (
     is_last_message_stale,
     should_block,
@@ -27,7 +27,8 @@ class Chat(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="chat")
-    async def chat(self, int: discord.Interaction):
+    async def chat(self, int: discord.Interaction, assistant_id : str = "Not selected",
+            thread_id : str = None):
         """Start a chat with the bot in a thread"""
         try:
             # only support creating thread in text channel
@@ -48,9 +49,11 @@ class Chat(commands.Cog):
             )
 
             # Call openai api to create thread
-            openai_thread = await create_thread()
-            embed.add_field(name="thread_id", value=openai_thread.id)
-            embed.add_field(name="assistant_id", value="Not selected")
+            if thread_id is None:
+                openai_thread = await create_thread()
+                thread_id = openai_thread.id
+            embed.add_field(name="thread_id", value=thread_id)
+            embed.add_field(name="assistant_id", value=assistant_id)
             await int.response.send_message(embed=embed)
 
             # create the thread
@@ -62,9 +65,12 @@ class Chat(commands.Cog):
                 auto_archive_duration=60,
             )
 
+            if assistant_id != "Not selected":
+                return
+
             # Show assistants as a select menu
             view = SelectView(thread=thread)
-            assistants = await list_assistants()
+            assistants = await list_assistants(MAX_ASSISTANT_LIST)
             for assistant in assistants:
                 view.selectMenu.add_option(
                     label=assistant.name,
