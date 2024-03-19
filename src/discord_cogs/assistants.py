@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 
 import logging
 
@@ -19,6 +20,7 @@ from src.openai_api.assistants import (
     list_assistants,
     update_assistant,
 )
+from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +71,10 @@ class Assistant(commands.Cog):
             # Tools
             tools = []
             await thread.send("What are the tools for your assistant?")
+
+            # File retrieval
             retrieval_view = TrueFalseView()
-            await thread.send("Files", view=retrieval_view)
+            await thread.send("# Files", view=retrieval_view)
             try:
                 retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
                 if retrieval_value:
@@ -78,14 +82,59 @@ class Assistant(commands.Cog):
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click")
 
+            # Code interpreter
+            code_interpreter_view = TrueFalseView()
+            await thread.send(
+                "# Code Interpreter\n**NOTE :** It should also be enabled if you need to handle file types other than .txt.", 
+                view=code_interpreter_view
+            )
+            try:
+                code_interpreter_value = await asyncio.wait_for(code_interpreter_view.value, timeout=180)
+                if code_interpreter_value:
+                    tools.append({"type": "code_interpreter"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
 
-            # TODO: add tools and file_ids
+            # File ids
+            file_ids = []
+            
+            # Add files to the assistant if file retrieval is enabled
+            if retrieval_value:
+                file_upload_view = YesNoView(
+                    {
+                        "yes":"Please upload the files to be added to the assistant and send them at once if you want to add multiple files.",
+                        "no": "No files will be added to the assistant."
+                    }
+                )
+
+                await thread.send(
+                    "Would you like to add files to the assistant?",
+                    view=file_upload_view
+                )
+                
+                file_upload_value = False
+                try:
+                    file_upload_value = await asyncio.wait_for(file_upload_view.value, timeout=180)
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for button click")
+                
+                # Upload the files if the user wants to
+                if file_upload_value:
+                    message = await self.bot.wait_for("message", check=lambda m: m.author == user)
+                    if message.attachments:
+                        for attachment in message.attachments:
+                            pseudo_file = BytesIO(await attachment.read())
+                            file_id = await upload_file(file=pseudo_file)
+                            file_ids.append(file_id)  
+
+            # Create the assistant
             created = await create_assistant(
                 AssistantCreate(
                     name=name,
                     description=description.content,
                     instructions=instructions.content,
                     tools=tools,
+                    file_ids=file_ids,
                 )
             )
 
@@ -249,6 +298,33 @@ class TrueFalseView(discord.ui.View):
     @discord.ui.button(label="Disable", style=discord.ButtonStyle.red)
     async def false(self, int: discord.Interaction, button: discord.ui.Button):
         await int.response.send_message("Disabled", ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(False)
+
+class YesNoView(discord.ui.View):
+    def __init__(self, messages):
+        super().__init__()
+        self.value = asyncio.Future()
+        self.messages = messages
+    """
+    A view with two buttons, "Yes" and "No".
+    self.messages = {"yes": "Yes message", "no": "No message"}
+    """
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.green)
+    async def true(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message(self.messages["yes"], ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(True)
+    
+    @discord.ui.button(label="No", style=discord.ButtonStyle.red)
+    async def false(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message(self.messages["no"], ephemeral=True)
         self.stop()
         # disable the buttons
         for item in self.children:

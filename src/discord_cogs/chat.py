@@ -155,7 +155,7 @@ class Chat(commands.Cog):
                     for attachment in message.attachments:
                         # Handle the attachment
                         pseudo_file = BytesIO(await attachment.read())
-                        file_id = await upload_file(file=pseudo_file, purpose="assistants")
+                        file_id = await upload_file(file=pseudo_file)
                         file_ids.append(file_id)
 
                 # Generate the response
