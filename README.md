@@ -18,7 +18,7 @@ It is designed to facilitate interactive learning and engagement through group c
 
 - Supports multi-user interaction. The bot can recognize individual users in a thread and generate responses accordingly.
 
-- You can change the model, the default value is `gpt-4`.
+- You can change the model, the default value is `gpt-4`. Please set it to `gpt-4-turbo-preview` if you want to use `files (knowledge retrieval)` or `code interpreter`. 
 
 
 # Setup
