@@ -16,7 +16,7 @@ from src.discord_cogs._utils import (
     should_block,
     split_into_shorter_messages,
 )
-from src.models.api_responce import ResponceData, ResponceStatus
+from src.models.api_responce import ResponseData, ResponseStatus
 from src.models.message import MessageCreate
 from src.openai_api.assistants import list_assistants
 from src.openai_api.thread_messages import create_thread, generate_response
@@ -207,14 +207,14 @@ class SelectView(View):
 
 
 # TODO: remove unused args
-async def process_response(thread: discord.Thread, response_data: ResponceData) -> None:
+async def process_response(thread: discord.Thread, response_data: ResponseData) -> None:
     status = response_data.status
-    content = response_data.content
+    message = response_data.message
     status_text = response_data.status_text
 
-    if status is ResponceStatus.OK:
+    if status is ResponseStatus.OK:
         sent_message = None
-        if not content:
+        if not message:
             sent_message = await thread.send(
                 embed=discord.Embed(
                     description=f"**Invalid response** - empty response",
@@ -222,10 +222,15 @@ async def process_response(thread: discord.Thread, response_data: ResponceData) 
                 )
             )
         else:
-            content_rendered = "".join([c.render() for c in content])
-            shorter_response = split_into_shorter_messages(content_rendered)
-            for r in shorter_response:
-                sent_message = await thread.send(r)
+            message_rendered = await message.render()
+            shorter_response = split_into_shorter_messages(message_rendered.content)
+            for i, response in enumerate(shorter_response):
+                # Send attachments with last message
+                if i == len(shorter_response) - 1:
+                    message_rendered.content = response
+                    sent_message = await thread.send(**message_rendered.asdict())
+                else:
+                    sent_message = await thread.send(response)
 
     else:
         await thread.send(

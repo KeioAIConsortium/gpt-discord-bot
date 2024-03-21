@@ -9,7 +9,7 @@ from src.constants import ALLOWED_SERVER_IDS, MAX_CHARS_PER_REPLY_MSG
 logger = logging.getLogger(__name__)
 
 
-def split_into_shorter_messages(text, limit=MAX_CHARS_PER_REPLY_MSG, code_block="```"):
+def split_into_shorter_messages(text : str, limit=MAX_CHARS_PER_REPLY_MSG, code_block="```"):
     def split_at_boundary(s, boundary):
         parts = s.split(boundary)
         result = []
