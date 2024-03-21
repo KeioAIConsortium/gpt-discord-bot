@@ -4,7 +4,7 @@ import logging
 from openai import AsyncOpenAI
 from openai.types.beta.thread import Thread as OpenAIThread
 
-from src.models.api_responce import ResponseData, ResponseStatus
+from src.models.api_response import ResponseData, ResponseStatus
 from src.models.message import Message, MessageCreate
 
 logger = logging.getLogger(__name__)
