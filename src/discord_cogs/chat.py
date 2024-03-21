@@ -16,7 +16,7 @@ from src.discord_cogs._utils import (
     should_block,
     split_into_shorter_messages,
 )
-from src.models.api_responce import ResponseData, ResponseStatus
+from src.models.api_response import ResponseData, ResponseStatus
 from src.models.message import MessageCreate
 from src.openai_api.assistants import list_assistants
 from src.openai_api.thread_messages import create_thread, generate_response
