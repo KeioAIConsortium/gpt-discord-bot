@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from io import BytesIO
+
 import logging
 
 import discord
@@ -17,6 +20,7 @@ from src.openai_api.assistants import (
     list_assistants,
     update_assistant,
 )
+from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -64,12 +68,78 @@ class Assistant(commands.Cog):
             await thread.send("What are the instructions for your assistant?")
             instructions = await self.bot.wait_for("message", check=lambda m: m.author == user)
 
-            # TODO: add tools and file_ids
+            # Tools
+            tools = []
+            await thread.send("What are the tools for your assistant?")
+
+            # File retrieval
+            retrieval_view = TrueFalseView()
+            await thread.send("# Files", view=retrieval_view)
+            retrieval_value = False
+            try:
+                retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
+                if retrieval_value:
+                    tools.append({"type": "retrieval"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+
+            # Code interpreter
+            code_interpreter_view = TrueFalseView()
+            await thread.send(
+                "# Code Interpreter\n**NOTE :** It should also be enabled if you need to handle file types other than .txt.", 
+                view=code_interpreter_view
+            )
+            code_interpreter_value = False
+            try:
+                code_interpreter_value = await asyncio.wait_for(code_interpreter_view.value, timeout=180)
+                if code_interpreter_value:
+                    tools.append({"type": "code_interpreter"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+
+            # File ids                
+            file_ids = [] # Default value
+
+            # Add files to the assistant if file retrieval or code interpreter is enabled
+            if retrieval_value or code_interpreter_value:
+                file_upload_view = YesNoView(
+                    {
+                        "yes":"Please upload the files to be added to the assistant\n Send them at once if you want to add multiple files.",
+                        "no": "No files will be added to the assistant."
+                    }
+                )
+
+                await thread.send(
+                    "Would you like to add files to the assistant?",
+                    view=file_upload_view
+                )
+                
+                file_upload_value = False
+                try:
+                    file_upload_value = await asyncio.wait_for(file_upload_view.value, timeout=180)
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for button click. No files will be added to the assistant.")
+
+
+                # Upload the files if the user wants to
+                if file_upload_value:
+                    message = await self.bot.wait_for("message", check=lambda m: m.author == user)
+                    if message.attachments:
+                        for attachment in message.attachments:
+                            pseudo_file = BytesIO(await attachment.read())
+                            file_id = await upload_file(file=pseudo_file)
+                            file_ids.append(file_id) 
+            else:
+                file_ids = [] # Reset file_ids
+
+            # Create the assistant
             created = await create_assistant(
                 AssistantCreate(
                     name=name,
                     description=description.content,
                     instructions=instructions.content,
+                    tools=tools,
+                    file_ids=file_ids,
                 )
             )
 
@@ -130,8 +200,97 @@ class Assistant(commands.Cog):
             if instructions.content != ".":
                 assistant.instructions = instructions.content
 
-            # TODO: add tools and file_ids
+            # Tools
+            await thread.send("What are the tools that your assistant can use?")
+            
+            tools = []
 
+            # File retrieval
+            retrieval_view = TrueFalseView()
+            await thread.send("# Files", view=retrieval_view)
+            retrieval_value = False
+            try:
+                retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
+                if retrieval_value:
+                    tools.append({"type": "retrieval"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click. Files was disabled.")
+
+            # Code interpreter
+            code_interpreter_view = TrueFalseView()
+            await thread.send(
+                "# Code Interpreter\n**NOTE :** It should also be enabled if you need to handle file types other than .txt.", 
+                view=code_interpreter_view
+            )
+            code_interpreter_value = False
+            try:
+                code_interpreter_value = await asyncio.wait_for(code_interpreter_view.value, timeout=180)
+                if code_interpreter_value:
+                    tools.append({"type": "code_interpreter"})
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click. Code interpreter was disabled.")
+            
+            assistant.tools = tools # Update tools
+            
+            # Add file_ids to the assistant only if file retrieval or code interpreter is enabled
+            if retrieval_value or code_interpreter_value:
+                # Check if the user wants to keep the existing files
+                keep_files_view = YesNoView(
+                    {
+                        "yes": "The existing files were removed.",
+                        "no": "The existing files were not removed."
+                    }
+                )
+                await thread.send(
+                    "Would you like to **Keep** the files? If no, the existing files will be removed.", 
+                    view=keep_files_view
+                )
+                
+                keep_files_value = False
+                try:
+                    keep_files_value = await asyncio.wait_for(keep_files_view.value, timeout=180)
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for button click. The existing files were not removed.")
+                
+                if keep_files_value:
+                    file_ids = assistant.file_ids # Keep the existing file_ids
+                else:
+                    file_ids = [] # Reset file_ids
+                
+                # Ask the user if they want to add more files
+                file_upload_view = YesNoView(
+                    {
+                        "yes":"Please upload the files to be added to the assistant and send them at once if you want to add multiple files.",
+                        "no": "No files will be added to the assistant."
+                    }
+                )
+
+                await thread.send(
+                    "Would you like to add files to the assistant?",
+                    view=file_upload_view
+                )
+                
+                file_upload_value = False
+                try:
+                    file_upload_value = await asyncio.wait_for(file_upload_view.value, timeout=180)
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for button click. No files will be added to the assistant.")
+                
+                # Upload the files if the user wants to
+                if file_upload_value:
+                    message = await self.bot.wait_for("message", check=lambda m: m.author == user)
+                    if message.attachments:
+                        for attachment in message.attachments:
+                            pseudo_file = BytesIO(await attachment.read())
+                            file_id = await upload_file(file=pseudo_file)
+                            file_ids.append(file_id)
+            
+                assistant.file_ids = file_ids # Update file_ids
+            else:
+                # Remove all file_ids if file retrieval and code interpreter are disabled
+                assistant.file_ids = []
+
+            # Update the assistant
             updated = await update_assistant(assistant)
 
             return await thread.send(f"Updated assistant `{updated.id}` ")
@@ -216,6 +375,55 @@ class DeleteConfirmView(discord.ui.View):
         # delete the original message
         await int.followup.delete_message(int.message.id)
 
+
+class TrueFalseView(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        self.value = asyncio.Future()
+    @discord.ui.button(label="Enable", style=discord.ButtonStyle.green)
+    async def true(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message("Enabled", ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(True)
+
+    @discord.ui.button(label="Disable", style=discord.ButtonStyle.red)
+    async def false(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message("Disabled", ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(False)
+
+class YesNoView(discord.ui.View):
+    def __init__(self, messages):
+        super().__init__()
+        self.value = asyncio.Future()
+        self.messages = messages
+    """
+    A view with two buttons, "Yes" and "No".
+    self.messages = {"yes": "Yes message", "no": "No message"}
+    """
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.green)
+    async def true(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message(self.messages["yes"], ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(True)
+    
+    @discord.ui.button(label="No", style=discord.ButtonStyle.red)
+    async def false(self, int: discord.Interaction, button: discord.ui.Button):
+        await int.response.send_message(self.messages["no"], ephemeral=True)
+        self.stop()
+        # disable the buttons
+        for item in self.children:
+            item.disabled = True
+        self.value.set_result(False)
 
 async def setup(bot):
     await bot.add_cog(Assistant(bot))

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import logging
 
 import discord
@@ -18,6 +20,7 @@ from src.models.api_responce import ResponceData, ResponceStatus
 from src.models.message import MessageCreate
 from src.openai_api.assistants import list_assistants
 from src.openai_api.thread_messages import create_thread, generate_response
+from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +132,7 @@ class Chat(commands.Cog):
                 f"Thread message to process - {message.author}: {message.content[:50]} - {thread.name} {thread.jump_url}"
             )
 
-            # generate the response
+            # Handle the message in the thread
             async with thread.typing():
                 # get field of embed in the first message of thread
                 openai_thread_id = thread.starter_message.embeds[0].fields[0].value
@@ -143,6 +146,19 @@ class Chat(commands.Cog):
                         )
                     )
                     return
+                                
+                # Add the files to the thread when message has attachments
+                # TODO: Error handling when len(message.attachments) > 10 or size > 512MB
+                # TODO: Restrict file types
+                file_ids = []
+                if message.attachments:
+                    for attachment in message.attachments:
+                        # Handle the attachment
+                        pseudo_file = BytesIO(await attachment.read())
+                        file_id = await upload_file(file=pseudo_file)
+                        file_ids.append(file_id)
+
+                # Generate the response
                 response_data = await generate_response(
                     thread_id=openai_thread_id,
                     assistant_id=openai_assistant_id,
@@ -150,6 +166,7 @@ class Chat(commands.Cog):
                         thread_id=openai_thread_id,
                         author_name=message.author.display_name,
                         message=message.content,
+                        file_ids=file_ids,
                     ),
                 )
 
