@@ -222,15 +222,16 @@ async def process_response(thread: discord.Thread, response_data: ResponseData) 
                 )
             )
         else:
-            message_rendered = await message.render()
-            shorter_response = split_into_shorter_messages(message_rendered.content)
-            for i, response in enumerate(shorter_response):
-                # Send attachments with last message
-                if i == len(shorter_response) - 1:
-                    message_rendered.content = response
-                    sent_message = await thread.send(**message_rendered.asdict())
-                else:
-                    sent_message = await thread.send(response)
+            messages_rendered = await message.render()
+            for message_rendered in messages_rendered:
+                shorter_response = split_into_shorter_messages(message_rendered.content)
+                for i, response in enumerate(shorter_response):
+                    # Send attachments with last message
+                    if i == len(shorter_response) - 1:
+                        message_rendered.content = response
+                        sent_message = await thread.send(**message_rendered.asdict())
+                    else:
+                        sent_message = await thread.send(response)
 
     else:
         await thread.send(
