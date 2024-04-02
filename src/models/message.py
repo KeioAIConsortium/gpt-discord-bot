@@ -13,9 +13,35 @@ from discord import (
 )
 
 from src.openai_api.files import get_image_file
+
 from io import BytesIO
+import re
+from matplotlib import (
+    pyplot as plt,
+    font_manager,
+)
+import matplotlib
+import shutil
+from collections import deque
+import os
 
 logger = logging.getLogger(__name__)
+
+# Set the font to use in matplotlib
+# TODO: Install Latex Engine
+font_name = os.getenv('LATEX_FONT', 'DejaVu Sans')
+# Check if the font is available
+available_fonts = [f.name for f in font_manager.fontManager.ttflist]
+if font_name in available_fonts:
+    # Set the font
+    plt.rcParams['font.family'] = font_name
+    print(f"Font '{font_name}' is found and set successfully.")
+else:
+    # Remove the cache file to avoid the error
+    shutil.rmtree(matplotlib.get_cachedir())
+    print("The font cannnot be loaded. Please try again after install it.")
+    print("If it is installed, this error may be caused by cache file and it was removed now.")
+    print("Please excute this program again.")
 
 @dataclass
 class DiscordMessage:
@@ -86,22 +112,30 @@ class Message:
                 )
             else:
                 logger.warning(f"Unknown content type: {content_dct['type']}")
+        print("[Deb]->contents_converted: ", contents_converted)
 
         return cls(content=contents_converted, **dct)
 
-    async def render(self) -> DiscordMessage:
+    async def render(self) -> list[DiscordMessage]:
         """
-        Render the Message object to DiscordMessage object
+        Render the Message object to the list of DiscordMessage object
         """
-        rendered = DiscordMessage(
-            content="",
-            files=[],
-        )
+        # the list of DiscordMessage object to return
+        rendered = []
+
+        # Render the content based on the type
         for content in self.content:
+            # Text content
             if type(content) == ContentText:
-                rendered.content += content.render() + "\n"
+                rendered += content.render()
+            # Image content
             elif type(content) == ContentImageFile:
-                rendered.files.append(await content.render())
+                if rendered:
+                    message = await content.render()
+                    rendered[-1].files += message.files
+                else:
+                    rendered.append(await content.render())
+        print("[Deb]->rendered message: ", str(rendered))
         return rendered
 
 @dataclass
@@ -123,14 +157,156 @@ class ContentText:
                 logger.warning(f"Unknown annotation type: {annotation['type']}")
         return cls(**api_output)
 
-    def render(self) -> str:
-        """Render the ContentText object to string to display in discord"""
+    def render(self) -> list[DiscordMessage]:
+        """Render the ContentText object to list of DiscordMessage Object"""
         # TODO: fix render annotations
-        rendered = self.value
+        # TODO: add File Download via URL
+        # Get the text
+        waiting_processing_stack = deque()
+        rendered = []
+        initial_message = DiscordMessage(
+            content=self.value,
+            files=[],
+        )
+        waiting_processing_stack.append(initial_message)
+        while waiting_processing_stack:
+            print(f'[Deb]->len(waiting_processing_stack): {len(waiting_processing_stack)}')
+            processing_message = waiting_processing_stack.pop()
+            processing_text = processing_message.content
+            processing_message_attachments = processing_message.files
+            
+            # Process the display formula
+            # TODO: Detect `$$` pattern
+            display_pattern = r'\\\[([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?)\\\]'
+            display_match = re.search(display_pattern, processing_text, re.DOTALL)
+            if display_match:
+                # Get the formula and the text before and after the formula
+                pre_text = processing_text[:display_match.start()]
+                formula = display_match.group(1)
+                post_text = processing_text[display_match.end():]
+
+                # Process the message from back to front to keep the order in the stack
+                # Create discord message of text after the formula
+                if post_text:
+                    print(f'[Deb]->post_text: {post_text}')
+                    post_message = DiscordMessage(
+                        content=post_text,
+                        files=processing_message_attachments, # Processing attachments are passed to the post message
+                    )
+                    waiting_processing_stack.append(post_message)
+                
+                # Create discord message of the formula
+                if formula:
+                    print(f'[Deb]->formula: {formula}')
+                    # Convert the formula to latex style
+                    formula = re.sub(r'[\n\t]', '', formula)
+                    formula = '$' + formula + '$'
+                    # Convert the latex style formula to image
+                    plt.figure(figsize=(1, 1))
+                    plt.text(0.5, 0.5, formula, fontsize=24, ha='center', va='center', color='white')
+                    plt.axis('off')
+                    pseudo_file = BytesIO()
+                    plt.savefig(
+                        pseudo_file,
+                        format='png',
+                        transparent=True,
+                        bbox_inches='tight',
+                        pad_inches=0
+                    )
+                    plt.clf()
+                    pseudo_file.seek(0)
+                    formula_image = File(fp=pseudo_file, filename="formula.png")
+                    formula_message = DiscordMessage(
+                        content="",
+                        files=[formula_image],
+                    )
+                    waiting_processing_stack.append(formula_message)
+                # Create discord message of text before the formula
+                if pre_text:
+                    print(f'[Deb]->pre_text: {pre_text}')
+                    pre_message = DiscordMessage(
+                        content=pre_text,
+                        files=[],
+                    )
+                    waiting_processing_stack.append(pre_message)
+                # Continue the loop to process the message in step by step
+                continue
+
+            # Process the inline formula
+            # TODO: Detect `$` pattern
+            inline_pattern = r'\\\([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?\\\)'
+            inline_match = re.search(inline_pattern, processing_text, re.DOTALL)
+            if inline_match:
+                # Get the a line with inline formula and the text before and after the formula
+                preline_pos = processing_text.rfind('\n', 0, inline_match.start())
+                postline_pos = processing_text.find('\n', inline_match.end())
+                
+                pre_line = processing_text[:preline_pos].strip() if preline_pos != -1 else ''
+                line_with_formula = processing_text[preline_pos+1:postline_pos if postline_pos != -1 else None].strip()
+                post_line = processing_text[postline_pos+1:].strip() if postline_pos != -1 else ''
+            
+                # Create discord message of line after inline formula
+                if post_line:
+                    print(f'[Deb]->post_line: {post_line}')
+                    post_message = DiscordMessage(
+                        content=post_line,
+                        files=processing_message_attachments, # Processing attachments are passed to the post message
+                    )
+                    waiting_processing_stack.append(post_message)
+                
+                # Create discord message of inline formula
+                inline_formulas = set(re.findall(inline_pattern, line_with_formula))
+                print(f'[Deb]->inline_formulas: {inline_formulas}')
+                if inline_formulas:
+                    # Modify the text to replace the inline formula with latex style
+                    modified_line = line_with_formula
+                    for original_formula in inline_formulas:
+                        modified_formula = original_formula.replace("\\(", "$").replace("\\)", "$")
+                        modified_line = modified_line.replace(original_formula, modified_formula)
+                    print(f'[Deb]->modified_line: {modified_line}')
+                    # Convert the modified text to the image to display in Discord
+                    plt.figure(figsize=(1, 1))
+                    plt.text(0.01, 0.99,  modified_line, wrap=True, fontsize=18, ha='left', va='top', color='white')
+                    plt.axis('off')
+                    pseudo_file = BytesIO()
+                    plt.savefig(
+                        pseudo_file,
+                        format='png',
+                        transparent=True,
+                        pad_inches=0.1,
+                        bbox_inches='tight',
+                    )
+                    plt.clf()
+                    pseudo_file.seek(0)
+                    inline_formula_image = File(fp=pseudo_file, filename="message.png")
+                    # Create the discord message of the inline formula
+                    inline_formula_message = DiscordMessage(
+                        content="",
+                        files=[inline_formula_image],
+                    )
+                    waiting_processing_stack.append(inline_formula_message)
+                # Create the discord message of line before inline formula
+                if pre_line:
+                    print(f'[Deb]->pre_line: {pre_line}')
+                    post_message = DiscordMessage(
+                        content=pre_line,
+                        files=processing_message_attachments, # Processing attachments are passed to the post message
+                    )
+                    waiting_processing_stack.append(post_message)
+                continue
+
+            # If there is nothing to process, add the message to the rendered list
+            rendered.append(processing_message)
+            print(f'[Deb]->len(text.rendered): {len(rendered)}')
+
         if self.annotations:
             for annotation in self.annotations:
-                rendered += f"\n{annotation.render()}"
+                message = DiscordMessage(
+                    content=annotation.render(),
+                )
+                rendered.append(message)
         return rendered
+
 
 @dataclass
 class AnnotationFilePath:
@@ -157,9 +333,13 @@ class ContentImageFile:
     def from_api_output(cls, api_output: dict[str, Any]) -> ContentImageFile:
         return cls(**api_output)
 
-    async def render(self) -> File:
-        """Render the ContentImageFile object to discord File object"""
+    async def render(self) -> DiscordMessage:
+        """Render the ContentImageFile object to DiscordMessage object"""
         image_bytes = await get_image_file(self.file_id)
-        psuedo_file = BytesIO(image_bytes)
-        discord_file = File(fp=psuedo_file, filename="output_image.png")
-        return discord_file
+        pseudo_file = BytesIO(image_bytes)
+        discord_file = File(fp=pseudo_file, filename="output_image.png")
+        rendered = DiscordMessage(
+            content="",
+            files=[discord_file],
+        )
+        return rendered
