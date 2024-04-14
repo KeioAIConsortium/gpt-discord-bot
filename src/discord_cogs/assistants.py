@@ -299,11 +299,25 @@ class Assistant(commands.Cog):
             logger.exception(e)
             await int.response.send_message(f"Failed to start chat {str(e)}", ephemeral=True)
 
+    @app_commands.command(name="show")
+    async def show(self, int: discord.Interaction, assistant_id: str):
+        """Show the specified assistant"""
+        await int.response.defer()
+        assistant = await get_assistant(assistant_id)
+        s = f"```Name: {assistant.name}\n"
+        s += f"Description: {assistant.description}\n"
+        s += f"Instructions: {assistant.instructions}\n"
+        s += f"Tools: {assistant.tools}\n"
+        s += f"Files: {assistant.file_ids}```"
+        await int.followup.send(content=s)
+
     @app_commands.command(name="list")
-    async def list(self, int: discord.Interaction, max: int = MAX_ASSISTANT_LIST):
+    async def list(self, int: discord.Interaction, offset: int = 0,
+            max: int = MAX_ASSISTANT_LIST):
         """List available assistants with optional limit (default MAX_ASSISTANT_LIST)"""
         await int.response.defer()
-        assistants = await list_assistants(limit=max)
+        assistants = await list_assistants(limit=offset+max)
+        assistants = assistants[offset:]
         header = "Available Assistants 🤖 `[assistant_id] name - description`\n"
         rendered = "".join([f"```{assistant.render()}```" for assistant in assistants])
         await int.followup.send(content=f"{header}{rendered}")

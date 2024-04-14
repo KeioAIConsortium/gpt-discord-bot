@@ -57,11 +57,13 @@ It is designed to facilitate interactive learning and engagement through group c
 
 The bot operates via slash commands. Type `/` in a text channel to view available commands.
 
-- **`/build`**: Initiates an assistant creation process. Users can define the assistant's name, description, and instructions in a guided, interactive thread.
+- **`/build`**: Initiates an assistant creation process. Users can define the assistant's name, description, and instructions in a guided, interactive thread. Users can also specify tools, such as file retrieval or code interpreter.
 
-- **`/update`**: Initiates an assistant update process. Users can redefine the assistant's description and instructions in a guided, interactive thread. If users do not want to change any of these, they can specify '.' to indicate no change.
+- **`/update`**: Initiates an assistant update process. Users can redefine the assistant's description and instructions in a guided, interactive thread. If users do not want to change any of these, they can specify '.' to indicate no change. Users can also change tools and add or remove files.
 
-- **`/list`**: Displays a list of the 20 newest assistants.
+- **`/show`**: Shows the configuration of the specified assistant.
+
+- **`/list`**: Displays a list of the 20 newest assistants (from the specified offset).
 
 - **`/delete`**: Allows users to delete a specified assistant, with confirmations to prevent accidental deletions.
 
