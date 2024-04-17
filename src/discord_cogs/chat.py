@@ -154,7 +154,11 @@ class Chat(commands.Cog):
                 if message.attachments:
                     for attachment in message.attachments:
                         # Handle the attachment
-                        pseudo_file = BytesIO(await attachment.read())
+                        pseudo_file = ( 
+                            attachment.filename, 
+                            await attachment.read(), 
+                            attachment.content_type
+                        )
                         file_id = await upload_file(file=pseudo_file)
                         file_ids.append(file_id)
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from io import BytesIO
 
 import logging
 
@@ -126,7 +125,11 @@ class Assistant(commands.Cog):
                     message = await self.bot.wait_for("message", check=lambda m: m.author == user)
                     if message.attachments:
                         for attachment in message.attachments:
-                            pseudo_file = BytesIO(await attachment.read())
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
                             file_id = await upload_file(file=pseudo_file)
                             file_ids.append(file_id) 
             else:
@@ -281,7 +284,11 @@ class Assistant(commands.Cog):
                     message = await self.bot.wait_for("message", check=lambda m: m.author == user)
                     if message.attachments:
                         for attachment in message.attachments:
-                            pseudo_file = BytesIO(await attachment.read())
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
                             file_id = await upload_file(file=pseudo_file)
                             file_ids.append(file_id)
             
