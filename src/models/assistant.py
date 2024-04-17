@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
+from pydantic import BaseModel
 
 from openai.types.beta.assistant import Assistant as OpenAIAssistant
 
@@ -26,7 +27,7 @@ class AssistantCreate:
 
 
 @dataclass
-class Assistant:
+class Assistant(BaseModel):
     id: str
     created_at: int | None = None
     name: str | None = None
@@ -59,4 +60,4 @@ class Assistant:
         - Convert the OpenAIAssistant object to dict
         - Remove the key "object" from the dict
         """
-        return cls(**api_output.model_dump(exclude=["object"]))
+        return cls.model_validate(api_output.model_dump(exclude=["object"]))
