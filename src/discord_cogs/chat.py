@@ -18,7 +18,7 @@ from src.discord_cogs._utils import (
 )
 from src.models.api_response import ResponseData, ResponseStatus
 from src.models.message import MessageCreate
-from src.openai_api.assistants import list_assistants
+from src.openai_api.assistants import list_assistants, get_assistant
 from src.openai_api.thread_messages import create_thread, generate_response
 from src.openai_api.files import upload_file
 
@@ -55,8 +55,14 @@ class Chat(commands.Cog):
             if thread_id is None:
                 openai_thread = await create_thread()
                 thread_id = openai_thread.id
+            if assistant_id == "Not selected":
+                name = "Unknown"
+            else:
+                assistant = await get_assistant(assistant_id)
+                name = assistant.name
             embed.add_field(name="thread_id", value=thread_id)
             embed.add_field(name="assistant_id", value=assistant_id)
+            embed.add_field(name="name", value=name)
             await int.response.send_message(embed=embed)
 
             # create the thread
@@ -78,7 +84,8 @@ class Chat(commands.Cog):
                 view.selectMenu.add_option(
                     label=assistant.name,
                     value=assistant.id,
-                    description=assistant.description,
+                    description=assistant.description[0:min([100,
+                            len(assistant.description)])],
                 )
             await thread.send("Select your assistant", view=view)
 
@@ -206,7 +213,9 @@ class SelectView(View):
 
         # modify the starter embed in the thread
         embed = self.thread.starter_message.embeds[0]
-        embed.set_field_at(-1, name="assistant_id", value=selected)
+        embed.set_field_at(-2, name="assistant_id", value=selected)
+        assistant = await get_assistant(selected)
+        embed.set_field_at(-1, name="name", value=assistant.name)
         await self.thread.starter_message.edit(embed=embed)
 
 
