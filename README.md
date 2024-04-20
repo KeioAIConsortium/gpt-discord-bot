@@ -61,9 +61,9 @@ The bot operates via slash commands. Type `/` in a text channel to view availabl
 
 - **`/update`**: Initiates an assistant update process. Users can redefine the assistant's description and instructions in a guided, interactive thread. If users do not want to change any of these, they can specify '.' to indicate no change. Users can also change tools and add or remove files.
 
-- **`/show`**: Shows the configuration of the specified assistant.
+- **`/show`**: Shows the configuration of the specified assistant. If the content is long (>1,500 characters), the response message will be split.
 
-- **`/list`**: Displays a list of the 20 newest assistants (from the specified offset).
+- **`/list`**: Displays a list of the 20 newest assistants (from the specified offset). If the content is long (>1,500 characters), the response message will be split.
 
 - **`/delete`**: Allows users to delete a specified assistant, with confirmations to prevent accidental deletions.
 

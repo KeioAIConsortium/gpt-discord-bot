@@ -9,8 +9,12 @@ import openai
 from discord import app_commands
 from discord.ext import commands
 
-from src.constants import ACTIVATE_BUILD_THREAD_PREFIX, MAX_ASSISTANT_LIST
-from src.discord_cogs._utils import should_block
+from src.constants import (
+    ACTIVATE_BUILD_THREAD_PREFIX,
+    MAX_ASSISTANT_LIST,
+    MAX_CHARS_PER_REPLY_MSG,
+)
+from src.discord_cogs._utils import should_block, split_into_shorter_messages
 from src.models.assistant import AssistantCreate
 from src.openai_api.assistants import (
     create_assistant,
@@ -316,7 +320,10 @@ class Assistant(commands.Cog):
         s += f"Instructions: {assistant.instructions}\n"
         s += f"Tools: {assistant.tools}\n"
         s += f"Files: {assistant.file_ids}```"
-        await int.followup.send(content=s)
+        responses = split_into_shorter_messages(s)
+        for response in responses:
+            if len(response) > 0:
+                await int.followup.send(content=response)
 
     @app_commands.command(name="list")
     async def list(self, int: discord.Interaction, offset: int = 0,
@@ -325,9 +332,14 @@ class Assistant(commands.Cog):
         await int.response.defer()
         assistants = await list_assistants(limit=offset+max)
         assistants = assistants[offset:]
-        header = "Available Assistants 🤖 `[assistant_id] name - description`\n"
-        rendered = "".join([f"```{assistant.render()}```" for assistant in assistants])
-        await int.followup.send(content=f"{header}{rendered}")
+        s = "Available Assistants 🤖 `[assistant_id] name - description`\n"
+        for assistant in assistants:
+            s1 = f"```{assistant.render()}```"
+            if len(s + s1) > MAX_CHARS_PER_REPLY_MSG:
+                await int.followup.send(content=s)
+                s = ''
+            s = s + s1
+        await int.followup.send(content=s)
 
     @app_commands.command(name="delete")
     async def delete(self, int: discord.Interaction, assistant_id: str):
