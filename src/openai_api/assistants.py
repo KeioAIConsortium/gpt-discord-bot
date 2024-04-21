@@ -15,8 +15,13 @@ async def create_assistant(cfg: AssistantCreate) -> Assistant:
     return Assistant.from_api_output(response)
 
 
-async def list_assistants(limit: int = "20", order: str = "desc") -> list[Assistant]:
-    response = await client.beta.assistants.list(limit=limit, order=order)
+async def list_assistants(limit: int = "20", order: str = "desc",
+        after: str = '') -> list[Assistant]:
+    if after == '':
+        response = await client.beta.assistants.list(limit=limit, order=order)
+    else:
+        response = await client.beta.assistants.list(limit=limit, order=order,
+                after=after)
     assistants = []
     for d in response.data:
         assistants.append(Assistant.from_api_output(d))

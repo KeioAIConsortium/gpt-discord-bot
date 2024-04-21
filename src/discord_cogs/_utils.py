@@ -4,9 +4,37 @@ from typing import Optional
 import discord
 from discord import Message as DiscordMessage
 
-from src.constants import ALLOWED_SERVER_IDS, MAX_CHARS_PER_REPLY_MSG
+from src.constants import (
+    ALLOWED_SERVER_IDS,
+    MAX_ASSISTANT_LIST,
+    MAX_CHARS_PER_REPLY_MSG
+)
+from src.openai_api.assistants import list_assistants
 
 logger = logging.getLogger(__name__)
+
+
+async def search_assistants(search: str = '', limit: int = MAX_ASSISTANT_LIST):
+    if search == '':
+        return await list_assistants(limit)
+
+    after = ''
+    found = []
+    while True:
+        assistants = await list_assistants(after=after)
+        for assistant in assistants:
+            if search in assistant.name \
+               or search in assistant.description \
+               or search in assistant.instructions:
+                found.append(assistant)
+            if len(found) >= limit:
+                return found
+
+        if len(assistants) < MAX_ASSISTANT_LIST:
+            break
+        after = assistants[-1].id
+
+    return found
 
 
 def split_into_shorter_messages(text : str, limit=MAX_CHARS_PER_REPLY_MSG, code_block="```"):
