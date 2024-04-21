@@ -13,6 +13,7 @@ from discord.ui import Select, View
 from src.constants import ACTIVATE_CHAT_THREAD_PREFIX, MAX_ASSISTANT_LIST
 from src.discord_cogs._utils import (
     is_last_message_stale,
+    search_assistants,
     should_block,
     split_into_shorter_messages,
 )
@@ -30,8 +31,9 @@ class Chat(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="chat")
-    async def chat(self, int: discord.Interaction, assistant_id : str = "Not selected",
-            thread_id : str = None):
+    async def chat(self, int: discord.Interaction,
+            assistant_id: str = "Not selected",
+            thread_id: str = None, search: str = ''):
         """Start a chat with the bot in a thread"""
         try:
             # only support creating thread in text channel
@@ -79,7 +81,7 @@ class Chat(commands.Cog):
 
             # Show assistants as a select menu
             view = SelectView(thread=thread)
-            assistants = await list_assistants(MAX_ASSISTANT_LIST)
+            assistants = await search_assistants(search=search)
             for assistant in assistants:
                 view.selectMenu.add_option(
                     label=assistant.name,

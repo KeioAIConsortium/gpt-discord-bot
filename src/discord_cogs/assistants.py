@@ -14,7 +14,11 @@ from src.constants import (
     MAX_ASSISTANT_LIST,
     MAX_CHARS_PER_REPLY_MSG,
 )
-from src.discord_cogs._utils import should_block, split_into_shorter_messages
+from src.discord_cogs._utils import (
+    search_assistants,
+    should_block,
+    split_into_shorter_messages,
+)
 from src.models.assistant import AssistantCreate
 from src.openai_api.assistants import (
     create_assistant,
@@ -327,10 +331,10 @@ class Assistant(commands.Cog):
 
     @app_commands.command(name="list")
     async def list(self, int: discord.Interaction, offset: int = 0,
-            max: int = MAX_ASSISTANT_LIST):
+            max: int = MAX_ASSISTANT_LIST, search: str = ''):
         """List available assistants with optional limit (default MAX_ASSISTANT_LIST)"""
         await int.response.defer()
-        assistants = await list_assistants(limit=offset+max)
+        assistants = await search_assistants(search=search, limit=offset+max)
         assistants = assistants[offset:]
         s = "Available Assistants 🤖 `[assistant_id] name - description`\n"
         for assistant in assistants:
