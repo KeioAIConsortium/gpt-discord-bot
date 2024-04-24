@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict, TypedDict, Literal, Required
 
 from openai.types.beta.threads import (
     Message as OpenAIThreadMessage,
@@ -343,3 +343,50 @@ class ContentImageFile:
             files=[discord_file],
         )
         return rendered
+
+
+class ParameterSchema(TypedDict):
+    type: str
+    description: str
+
+
+class FunctionParameters(TypedDict):
+    type: str
+    properties: Dict[str, ParameterSchema]
+    required: list[str]
+
+
+class FunctionDefinition(TypedDict, total=False):
+    name: Required[str]
+    description: str
+    parameters: FunctionParameters
+
+
+class FunctionTool(TypedDict):
+    function: Required[FunctionDefinition]
+    type: Required[Literal["function"]]
+
+
+def create_function(
+    name: str,
+    description: str,
+    parameters: Dict[str, ParameterSchema],
+    required_parameters: list[str],
+) -> FunctionTool:
+    function_params = {
+        "type": "object",
+        "description": description,
+        "properties": parameters,
+        "required": required_parameters,
+    }
+
+    function_definition: FunctionDefinition = {
+        "name": name,
+        "description": description,
+        "parameters": function_params,
+    }
+
+    return {
+        "function": function_definition,
+        "type": "function",
+    }

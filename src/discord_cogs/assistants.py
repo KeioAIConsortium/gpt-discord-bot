@@ -20,6 +20,7 @@ from src.discord_cogs._utils import (
     split_into_shorter_messages,
 )
 from src.models.assistant import AssistantCreate
+from src.discord_cogs.chat import FunctionSelectView
 from src.openai_api.assistants import (
     create_assistant,
     delete_assistant,
@@ -28,6 +29,7 @@ from src.openai_api.assistants import (
     update_assistant,
 )
 from src.openai_api.files import upload_file
+from src.openai_api.functions import available_functions
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +105,40 @@ class Assistant(commands.Cog):
                     tools.append({"type": "code_interpreter"})
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click")
+            
+            # Function Calling
+            # TODO: fix function selection
+            function_calling_view = TrueFalseView()
+            await thread.send("# Function Calling", view=function_calling_view)
+            function_calling_value = False
+            try:
+                function_calling_value = await asyncio.wait_for(function_calling_view.value, timeout=180)
+                if function_calling_value:
+                    tools.append({"type": "function"})
 
+                    view = FunctionSelectView(thread=thread, available_functions=available_functions)
+                    for func in available_functions:
+                        view.selectMenu.add_option(
+                        label=func["function"]["name"],
+                        value=func["function"]["name"],
+                        description=func["function"]["description"][0:min([100, len(func["function"]["description"])])],
+                    )
+                    await thread.send("Select the functions you want to add:", view=view)
+                    await view.wait()
+                    
+                    if view.done:
+                        selected_functions = view.selected_functions
+                        
+                        for func_name in selected_functions:
+                            func = next((f for f in available_functions if f["function"]["name"] == func_name), None)
+                            if func:
+                                tools.append({"function": func["function"]})
+                    else:
+                        await thread.send("No functions were added to the assistant.")
+                
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+                
             # File ids                
             file_ids = [] # Default value
 

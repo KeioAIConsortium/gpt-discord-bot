@@ -22,6 +22,7 @@ from src.models.message import MessageCreate
 from src.openai_api.assistants import list_assistants, get_assistant
 from src.openai_api.thread_messages import create_thread, generate_response
 from src.openai_api.files import upload_file
+from src.openai_api.functions import available_functions
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,66 @@ class SelectView(View):
         assistant = await get_assistant(selected)
         embed.set_field_at(-1, name="name", value=assistant.name)
         await self.thread.starter_message.edit(embed=embed)
+
+
+class FunctionSelectView(View):
+    def __init__(
+        self, *, thread: discord.Thread = None, available_functions: list = None
+    ):
+        super().__init__()
+        self.thread = thread
+        self.available_functions = available_functions
+        self.selected_functions = []
+        self.done = False
+
+    @discord.ui.select(
+        cls=Select,
+        placeholder="Select functions...",
+        min_values=1,
+        max_values=len(available_functions),
+    )
+    async def selectMenu(self, int: discord.Interaction, select: Select):
+        self.selected_functions = select.values
+
+        for option in select.options:
+            if option.value in self.selected_functions:
+                option.default = True
+            else:
+                option.default = False
+
+        await int.response.edit_message(view=self)
+
+        # Modify the starter embed in the thread
+        embed = self.thread.starter_message.embeds[0]
+        embed.clear_fields()
+
+        for func_name in self.selected_functions:
+            func = next(
+                (
+                    f
+                    for f in self.available_functions
+                    if f["function"]["name"] == func_name
+                ),
+                None,
+            )
+            if func:
+                embed.add_field(
+                    name=func["function"]["name"],
+                    value=func["function"]["description"],
+                    inline=False,
+                )
+
+        await self.thread.starter_message.edit(embed=embed)
+
+    @discord.ui.button(label="Done", style=discord.ButtonStyle.primary)
+    async def done_button(self, int: discord.Interaction, button: discord.ui.Button):
+        self.done = True
+        self.stop()
+        await int.response.defer()
+
+    async def on_timeout(self):
+        if not self.done:
+            await self.thread.send("Function selection timed out.")
 
 
 # TODO: remove unused args
