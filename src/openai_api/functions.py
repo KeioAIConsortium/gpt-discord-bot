@@ -42,6 +42,9 @@ get_wikipedia_summary = create_function(
     required_parameters=["query"],
 )
 
+def get_available_functions():
+    return available_functions
+    
 available_functions = [
     get_current_temperature,
     get_rain_probability,

@@ -29,7 +29,7 @@ from src.openai_api.assistants import (
     update_assistant,
 )
 from src.openai_api.files import upload_file
-from src.openai_api.functions import available_functions
+from src.openai_api.functions import get_available_functions
 
 logger = logging.getLogger(__name__)
 
@@ -116,29 +116,35 @@ class Assistant(commands.Cog):
                 if function_calling_value:
                     tools.append({"type": "function"})
 
-                    view = FunctionSelectView(thread=thread, available_functions=available_functions)
-                    for func in available_functions:
-                        view.selectMenu.add_option(
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+                
+            if function_calling_value:
+                view = FunctionSelectView(thread=thread)
+                available_functions = get_available_functions()
+                
+                for func in available_functions:
+                    view.selectMenu.add_option(
                         label=func["function"]["name"],
                         value=func["function"]["name"],
                         description=func["function"]["description"][0:min([100, len(func["function"]["description"])])],
                     )
-                    await thread.send("Select the functions you want to add:", view=view)
-                    await view.wait()
-                    
-                    if view.done:
-                        selected_functions = view.selected_functions
-                        
-                        for func_name in selected_functions:
-                            func = next((f for f in available_functions if f["function"]["name"] == func_name), None)
-                            if func:
-                                tools.append({"function": func["function"]})
+
+                await thread.send("Select the function:", view=view)
+            
+                try:
+                    await asyncio.wait_for(view.wait(), timeout=180)
+                    if view.selected_function:
+                        func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
+                        if func:
+                            tools.append({"function": func["function"]})
+                            print(f"Tools: {tools}")
+                            await thread.send("Function was added to the assistant.")
                     else:
-                        await thread.send("No functions were added to the assistant.")
-                
-            except asyncio.TimeoutError:
-                await thread.send("Timed out waiting for button click")
-                
+                        await thread.send("No function was added to the assistant.")
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for function selection. No function was added to the assistant.")
+            
             # File ids                
             file_ids = [] # Default value
 
