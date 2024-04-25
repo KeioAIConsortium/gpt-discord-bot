@@ -113,9 +113,6 @@ class Assistant(commands.Cog):
             function_calling_value = False
             try:
                 function_calling_value = await asyncio.wait_for(function_calling_view.value, timeout=180)
-                if function_calling_value:
-                    tools.append({"type": "function"})
-
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click")
                 
@@ -137,7 +134,7 @@ class Assistant(commands.Cog):
                     if view.selected_function:
                         func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
                         if func:
-                            tools.append({"function": func["function"]})
+                            tools.append({"type": "function", "function": func["function"]})
                             print(f"Tools: {tools}")
                             await thread.send("Function was added to the assistant.")
                     else:
@@ -184,6 +181,7 @@ class Assistant(commands.Cog):
             else:
                 file_ids = [] # Reset file_ids
 
+            print(f"Tools: {tools}")
             # Create the assistant
             created = await create_assistant(
                 AssistantCreate(
@@ -191,7 +189,7 @@ class Assistant(commands.Cog):
                     description=description.content,
                     instructions=instructions.content,
                     tools=tools,
-                    file_ids=file_ids,
+                    # file_ids=file_ids,
                 )
             )
 
