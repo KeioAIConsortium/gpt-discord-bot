@@ -20,6 +20,7 @@ from src.discord_cogs._utils import (
     split_into_shorter_messages,
 )
 from src.models.assistant import AssistantCreate
+from src.models.message import function_tool_to_dict
 from src.discord_cogs.chat import FunctionSelectView
 from src.openai_api.assistants import (
     create_assistant,
@@ -134,8 +135,9 @@ class Assistant(commands.Cog):
                     if view.selected_function:
                         func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
                         if func:
-                            tools.append({"type": "function", "function": func["function"]})
-                            print(f"Tools: {tools}")
+                            function_tool_dict = function_tool_to_dict(func)
+                            print(f"Function Tool: {function_tool_dict}")
+                            tools.append(function_tool_dict)
                             await thread.send("Function was added to the assistant.")
                     else:
                         await thread.send("No function was added to the assistant.")
@@ -189,7 +191,7 @@ class Assistant(commands.Cog):
                     description=description.content,
                     instructions=instructions.content,
                     tools=tools,
-                    # file_ids=file_ids,
+                    file_ids=file_ids,
                 )
             )
 

@@ -24,6 +24,7 @@ import matplotlib
 import shutil
 from collections import deque
 import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -389,4 +390,10 @@ def create_function(
     return {
         "function": function_definition,
         "type": "function",
+    }
+
+def function_tool_to_dict(func_tool: FunctionTool) -> dict[str, Any]:
+    return {
+        "type": func_tool["type"],
+        "function": func_tool["function"],
     }
