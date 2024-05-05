@@ -30,7 +30,7 @@ from src.openai_api.assistants import (
     update_assistant,
 )
 from src.openai_api.files import upload_file
-from src.openai_api.functions import get_available_functions
+from src.openai_api.function_tools import get_available_functions
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,6 @@ class Assistant(commands.Cog):
                         func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
                         if func:
                             function_tool_dict = function_tool_to_dict(func)
-                            print(f"Function Tool: {function_tool_dict}")
                             tools.append(function_tool_dict)
                             await thread.send("Function was added to the assistant.")
                     else:
@@ -183,7 +182,6 @@ class Assistant(commands.Cog):
             else:
                 file_ids = [] # Reset file_ids
 
-            print(f"Tools: {tools}")
             # Create the assistant
             created = await create_assistant(
                 AssistantCreate(

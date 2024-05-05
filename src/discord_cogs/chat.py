@@ -239,7 +239,6 @@ class FunctionSelectView(View):
         select.disabled = True
         await int.response.edit_message(view=self)
 
-        print(self.selected_function)
         # modify the starter embed in the thread
         embed = self.thread.starter_message.embeds[0]
         embed.add_field(name="selected_function", value=self.selected_function)

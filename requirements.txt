@@ -4,3 +4,4 @@ openai==1.14.2
 PyYAML==6.0
 dacite==1.6.*
 matplotlib==3.8.*
+mediawikiapi==1.2.*

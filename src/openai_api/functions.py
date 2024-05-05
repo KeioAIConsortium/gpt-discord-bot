@@ -1,52 +1,16 @@
-from src.models.message import create_function
-
-get_current_temperature = create_function(
-    name="get_current_temperature",
-    description="Get the current temperature for a specific location",
-    parameters={
-        "location": {
-            "type": "string",
-            "description": "The city and state, e.g., San Francisco, CA",
-        },
-        "unit": {
-            "type": "string",
-            "enum": ["Celsius", "Fahrenheit"],
-            "description": "The temperature unit to use. Infer this from the user's location.",
-        },
-    },
-    required_parameters=["location", "unit"],
-)
-
-get_rain_probability = create_function(
-    name="get_rain_probability",
-    description="Get the probability of rain for a specific location",
-    parameters={
-        "location": {
-            "type": "string",
-            "description": "The city and state, e.g., San Francisco, CA",
-        },
-    },
-    required_parameters=["location"],
-)
+from mediawikiapi import MediaWikiAPI
 
 
-get_wikipedia_summary = create_function(
-    name="get_wikipedia_summary",
-    description="Search Wikipedia for a summary of a topic",
-    parameters={
-        "query": {
-            "type": "string",
-            "description": "The search query to look up on Wikipedia",
-        },
-    },
-    required_parameters=["query"],
-)
+def get_wikipedia_summary_function(query: str) -> str | None:
+    mw = MediaWikiAPI()
+    mw.config.language = "ja"
+    search_result = mw.search(query)
 
-def get_available_functions():
-    return available_functions
-    
-available_functions = [
-    get_current_temperature,
-    get_rain_probability,
-    get_wikipedia_summary,
-]
+    if search_result:
+        page = mw.page(search_result[0])
+        summary = page.summary
+        url = page.url
+        
+        return f"{summary}\n\n{url}"
+    else:
+        return None
