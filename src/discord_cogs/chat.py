@@ -144,8 +144,9 @@ class Chat(commands.Cog):
             # Handle the message in the thread
             async with thread.typing():
                 # get field of embed in the first message of thread
-                openai_thread_id = thread.starter_message.embeds[0].fields[0].value
-                openai_assistant_id = thread.starter_message.embeds[0].fields[1].value
+                first_message = await thread.parent.fetch_message(thread.id)
+                openai_thread_id = first_message.embeds[0].fields[0].value
+                openai_assistant_id = first_message.embeds[0].fields[1].value
                 # TODO: appropriate error handling
                 if openai_assistant_id == "Not selected":
                     await thread.send(
