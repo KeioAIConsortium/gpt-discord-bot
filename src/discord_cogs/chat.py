@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 
 import logging
+import asyncio
 
 import discord
 from discord import Message as DiscordMessage
@@ -221,6 +222,29 @@ class SelectView(View):
         embed.set_field_at(-1, name="name", value=assistant.name)
         await self.thread.starter_message.edit(embed=embed)
 
+class FunctionSelectView(View):
+    def __init__(self, *, thread: discord.Thread = None):
+        super().__init__()
+        self.thread = thread
+        self.event = asyncio
+        self.selected_function = None
+        
+    @discord.ui.select(cls=Select, placeholder="Not selected")
+    async def selectMenu(self, int: discord.Interaction, select: Select):
+        self.selected_function = select.values[0]
+        for option in select.options:
+            if option.value == self.selected_function:
+                option.default = True
+                break
+
+        select.disabled = True
+        await int.response.edit_message(view=self)
+
+        # modify the starter embed in the thread
+        embed = self.thread.starter_message.embeds[0]
+        embed.add_field(name="selected_function", value=self.selected_function)
+        await self.thread.starter_message.edit(embed=embed)
+        self.stop()
 
 # TODO: remove unused args
 async def process_response(thread: discord.Thread, response_data: ResponseData) -> None:

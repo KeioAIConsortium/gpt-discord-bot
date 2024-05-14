@@ -10,6 +10,7 @@ from src.models.message import Message, MessageCreate
 logger = logging.getLogger(__name__)
 client = AsyncOpenAI()
 
+from src.openai_api.function_tools import get_function_tool_outputs
 
 async def create_thread() -> OpenAIThread:
     thread = await client.beta.threads.create()
@@ -44,6 +45,18 @@ async def generate_assistant_message_in_thread(thread_id: str, assistant_id: str
 
             await asyncio.sleep(1)
             run = await client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+
+            # Check if there are tool outputs to submit
+            if run.required_action and run.required_action.submit_tool_outputs:
+                tool_outputs = get_function_tool_outputs(
+                    run.required_action.submit_tool_outputs.tool_calls
+                )
+                if tool_outputs:
+                    run = await client.beta.threads.runs.submit_tool_outputs(
+                        thread_id=thread_id,
+                        run_id=run.id,
+                        tool_outputs=tool_outputs,
+                    )
 
         # If the run is completed, retreive the last message the assistant sent
         desc_thread_messages = await client.beta.threads.messages.list(thread_id)
