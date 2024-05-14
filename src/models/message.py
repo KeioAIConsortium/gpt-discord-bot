@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any, List, Optional, Dict, TypedDict, Literal, Required
+from typing import Any, List, Optional, Dict, TypedDict, Literal
 
 from openai.types.beta.threads import (
     Message as OpenAIThreadMessage,
@@ -358,14 +358,14 @@ class FunctionParameters(TypedDict):
 
 
 class FunctionDefinition(TypedDict, total=False):
-    name: Required[str]
+    name: str
     description: str
     parameters: FunctionParameters
 
 
 class FunctionTool(TypedDict):
-    function: Required[FunctionDefinition]
-    type: Required[Literal["function"]]
+    function: FunctionDefinition
+    type: Literal["function"]
 
 
 def create_function(
