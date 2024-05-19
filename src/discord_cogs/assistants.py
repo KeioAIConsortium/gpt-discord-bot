@@ -409,7 +409,7 @@ class Assistant(commands.Cog):
         s += f"Description: {assistant.description}\n"
         s += f"Instructions: {assistant.instructions}\n"
         s += f"Tools: {assistant.tools}\n"
-        s += f"Files: {assistant.file_ids}```"
+        s += f"ToolResources: {assistant.tool_resources}```"
         responses = split_into_shorter_messages(s)
         for response in responses:
             if len(response) > 0:
