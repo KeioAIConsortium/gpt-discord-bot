@@ -178,7 +178,7 @@ class Chat(commands.Cog):
                 # you should arrange to add a tools key to the attachment
                 attachments = None
                 if file_ids:
-                    attatchments = list(
+                    attachments = list(
                         map(
                             lambda file_id: {
                                 "file_id": file_id,
