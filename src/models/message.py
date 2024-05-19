@@ -109,6 +109,7 @@ class Message:
             "status",
             "metadata",
         ])
+        print("[Deb]->Message: ", dct)
         contents_dct = dct.pop("content")
         contents_converted = []
         for content_dct in contents_dct:
@@ -137,7 +138,7 @@ class Message:
         for content in self.content:
             # Text content
             if type(content) == ContentText:
-                rendered += content.render()
+                rendered += await content.render()
             # Image content
             elif type(content) == ContentImageFile:
                 if rendered:
@@ -156,24 +157,33 @@ class ContentText:
     @classmethod
     def from_api_output(cls, api_output: dict[str, Any]) -> ContentText:
         annotations_dct = api_output.pop("annotations")
-        annotations_converted = []
-        for annotation in annotations_dct:
-            if annotation["type"] == "file_path":
-                annotations_converted.append(
-                    AnnotationFilePath.from_api_output(annotation)
-                )
-            else:
-                # TODO: handle another annotation type
-                logger.warning(f"Unknown annotation type: {annotation['type']}")
-        return cls(**api_output)
+        annotations = None
+        if annotations_dct is not None:
+            annotations = []
+            for annotation in annotations_dct:
+                if annotation["type"] == "file_path":
+                    annotations.append(
+                        AnnotationFilePath.from_api_output(annotation)
+                    )
+                    print("[Deb]->annotations: ", annotations)
+                else:
+                    # TODO: handle another annotation type
+                    logger.warning(f"Unknown annotation type: {annotation['type']}")
+        return cls(value=api_output["value"], annotations=annotations)
 
-    def render(self) -> list[DiscordMessage]:
+    async def render(self) -> list[DiscordMessage]:
         """Render the ContentText object to list of DiscordMessage Object"""
         # TODO: fix render annotations
         # TODO: add File Download via URL
         # Get the text
         waiting_processing_stack = deque()
         rendered = []
+
+        if self.annotations is not None:
+            for annotation in reversed(self.annotations):
+                message = await annotation.render()
+                waiting_processing_stack.append(message)
+        
         initial_message = DiscordMessage(
             content=self.value,
             files=[],
@@ -310,12 +320,6 @@ class ContentText:
             rendered.append(processing_message)
             print(f'[Deb]->len(text.rendered): {len(rendered)}')
 
-        if self.annotations:
-            for annotation in self.annotations:
-                message = DiscordMessage(
-                    content=annotation.render(),
-                )
-                rendered.append(message)
         return rendered
 
 
@@ -331,14 +335,19 @@ class AnnotationFilePath:
     def from_api_output(cls, api_output: dict[str, Any]) -> AnnotationFilePath:
         return cls(**api_output)
 
-    def render(self) -> str:
+    async def render(self) -> DiscordMessage:
         """Render the ContentAnnotation object to string to display in discord"""
-        # TODO: render file path
-        return f"Annotation File Path {self.start}-{self.end}: {self.file_path['file_id']}"
+        image_file = await get_image_file(self.file_path['file_id'])
+        message = DiscordMessage(
+            content=f"",
+            files=[File(fp=BytesIO(image_file), filename="output_image.png")],
+        )
+        return message
 
 @dataclass
 class ContentImageFile:
     file_id: str | None = None
+    detail: str | None = None
 
     @classmethod
     def from_api_output(cls, api_output: dict[str, Any]) -> ContentImageFile:

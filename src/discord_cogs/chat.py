@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from io import BytesIO
+import os
 
 import logging
 import asyncio
@@ -26,6 +26,17 @@ from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
+FILE_SEARCH_EXTENSION = [
+    ".c", ".cs", ".cpp", ".doc", ".docx", ".html", ".java", ".json", 
+    ".md", ".pdf", ".php", ".pptx", ".py", ".rb", ".tex", ".txt", 
+    ".css", ".js", ".sh", ".ts"
+]
+CODE_INTERPRETER_EXTENSION = [
+    ".c", ".cs", ".cpp", ".doc", ".docx", ".html", ".java", ".json", 
+    ".md", ".pdf", ".php", ".pptx", ".py", ".rb", ".tex", ".txt", 
+    ".css", ".js", ".sh", ".ts", ".csv", ".jpeg", ".jpg", ".gif", 
+    ".png", ".tar", ".xlsx", ".xml", ".zip"
+]
 
 class Chat(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -161,35 +172,28 @@ class Chat(commands.Cog):
                 # Add the files to the thread when message has attachments
                 # TODO: Error handling when len(message.attachments) > 10 or size > 512MB
                 # TODO: Restrict file types
-                file_ids = []
+                attachments = None
                 if message.attachments:
+                    attachments = list()
                     for attachment in message.attachments:
                         # Handle the attachment
-                        pseudo_file = ( 
-                            attachment.filename, 
-                            await attachment.read(), 
-                            attachment.content_type
-                        )
-                        file_id = await upload_file(file=pseudo_file)
-                        file_ids.append(file_id)
-                
-                # Create attachments for the message
-                # If you want to control the tools used for each attachment, 
-                # you should arrange to add a tools key to the attachment
-                attachments = None
-                if file_ids:
-                    attachments = list(
-                        map(
-                            lambda file_id: {
+                        if (os.path.splitext(attachment.filename)[1] in FILE_SEARCH_EXTENSION 
+                            or os.path.splitext(attachment.filename)[1] in CODE_INTERPRETER_EXTENSION):
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
+                            file_id = await upload_file(file=pseudo_file)
+                            attachment_obj = {
                                 "file_id": file_id,
-                                "tools": [
-                                    {"type": "file_search"},
-                                    {"type": "code_interpreter"},
-                                ],
-                            },
-                            file_ids,
-                        )
-                    )
+                                "tools": [],
+                            }
+                            if os.path.splitext(attachment.filename)[1] in FILE_SEARCH_EXTENSION:
+                                attachment_obj["tools"].append({"type": "file_search"})
+                            if os.path.splitext(attachment.filename)[1] in CODE_INTERPRETER_EXTENSION:
+                                attachment_obj["tools"].append({"type": "code_interpreter"})
+                            attachments.append(attachment_obj)
 
                 # Generate the response
                 response_data = await generate_response(
