@@ -44,6 +44,8 @@ else:
     print("If it is installed, this error may be caused by cache file and it was removed now.")
     print("Please excute this program again.")
 
+process_inline_formula = False # os.getenv('PROCESS_INLINE_FORMULA', 'False').lower() == 'true'
+
 @dataclass
 class DiscordMessage:
     content: Optional[str] = None
@@ -65,16 +67,16 @@ class MessageCreate:
     thread_id: str
     content: str
     role: str = "user"
-    file_ids: list[str] | None = None
+    attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
     metadata: dict[str, str] | None = None
 
     @classmethod
     def from_discord_message(
-        self, thread_id: str, author_name: str, message: str, file_ids: list[str] | None = None
+        self, thread_id: str, author_name: str, message: str, attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
     ) -> MessageCreate:
         """Create an instance from the discord message"""
         content = f"{author_name}: {message}"
-        return self(thread_id=thread_id, content=content, file_ids=file_ids)
+        return self(thread_id=thread_id, content=content, attachments=attachments)
 
     def input_to_api_create(self) -> dict[str, str]:
         """Convert the MessageCreate object to dict for input to API create"""
@@ -91,7 +93,7 @@ class Message:
     assistant_id: str | None = None
     run_id: str | None = None
     file_ids: list[str] | None = None
-    metadata: dict[str, str] | None = None
+    attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
 
     @classmethod
     def from_api_output(cls, api_output: OpenAIThreadMessage) -> None:
@@ -99,7 +101,14 @@ class Message:
         - Convert the OpenAIThreadMessage object to dict
         - Remove the key "object" from the dict
         """
-        dct = api_output.model_dump(exclude=["object", "completed_at", "incomplete_at", "incomplete_details", "status"])
+        dct = api_output.model_dump(exclude=[
+            "object", 
+            "completed_at", 
+            "incomplete_at", 
+            "incomplete_details", 
+            "status",
+            "metadata",
+        ])
         contents_dct = dct.pop("content")
         contents_converted = []
         for content_dct in contents_dct:
@@ -233,68 +242,69 @@ class ContentText:
                 # Continue the loop to process the message in step by step
                 continue
 
-            # Process the inline formula
-            # TODO: Detect `$` pattern
-            inline_pattern = r'\\\([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?\\\)'
-            inline_match = re.search(inline_pattern, processing_text, re.DOTALL)
-            if inline_match:
-                # Get the a line with inline formula and the text before and after the formula
-                preline_pos = processing_text.rfind('\n', 0, inline_match.start())
-                postline_pos = processing_text.find('\n', inline_match.end())
+            if process_inline_formula:
+                # Process the inline formula
+                # TODO: Detect `$` pattern
+                inline_pattern = r'\\\([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?\\\)'
+                inline_match = re.search(inline_pattern, processing_text, re.DOTALL)
+                if inline_match:
+                    # Get the a line with inline formula and the text before and after the formula
+                    preline_pos = processing_text.rfind('\n', 0, inline_match.start())
+                    postline_pos = processing_text.find('\n', inline_match.end())
+                    
+                    pre_line = processing_text[:preline_pos].strip() if preline_pos != -1 else ''
+                    line_with_formula = processing_text[preline_pos+1:postline_pos if postline_pos != -1 else None].strip()
+                    post_line = processing_text[postline_pos+1:].strip() if postline_pos != -1 else ''
                 
-                pre_line = processing_text[:preline_pos].strip() if preline_pos != -1 else ''
-                line_with_formula = processing_text[preline_pos+1:postline_pos if postline_pos != -1 else None].strip()
-                post_line = processing_text[postline_pos+1:].strip() if postline_pos != -1 else ''
-            
-                # Create discord message of line after inline formula
-                if post_line:
-                    print(f'[Deb]->post_line: {post_line}')
-                    post_message = DiscordMessage(
-                        content=post_line,
-                        files=processing_message_attachments, # Processing attachments are passed to the post message
-                    )
-                    waiting_processing_stack.append(post_message)
-                
-                # Create discord message of inline formula
-                inline_formulas = set(re.findall(inline_pattern, line_with_formula))
-                print(f'[Deb]->inline_formulas: {inline_formulas}')
-                if inline_formulas:
-                    # Modify the text to replace the inline formula with latex style
-                    modified_line = line_with_formula
-                    for original_formula in inline_formulas:
-                        modified_formula = original_formula.replace("\\(", "$").replace("\\)", "$")
-                        modified_line = modified_line.replace(original_formula, modified_formula)
-                    print(f'[Deb]->modified_line: {modified_line}')
-                    # Convert the modified text to the image to display in Discord
-                    plt.figure(figsize=(1, 1))
-                    plt.text(0.01, 0.99,  modified_line, wrap=True, fontsize=18, ha='left', va='top', color='white')
-                    plt.axis('off')
-                    pseudo_file = BytesIO()
-                    plt.savefig(
-                        pseudo_file,
-                        format='png',
-                        transparent=True,
-                        pad_inches=0.1,
-                        bbox_inches='tight',
-                    )
-                    plt.clf()
-                    pseudo_file.seek(0)
-                    inline_formula_image = File(fp=pseudo_file, filename="message.png")
-                    # Create the discord message of the inline formula
-                    inline_formula_message = DiscordMessage(
-                        content="",
-                        files=[inline_formula_image],
-                    )
-                    waiting_processing_stack.append(inline_formula_message)
-                # Create the discord message of line before inline formula
-                if pre_line:
-                    print(f'[Deb]->pre_line: {pre_line}')
-                    post_message = DiscordMessage(
-                        content=pre_line,
-                        files=processing_message_attachments, # Processing attachments are passed to the post message
-                    )
-                    waiting_processing_stack.append(post_message)
-                continue
+                    # Create discord message of line after inline formula
+                    if post_line:
+                        print(f'[Deb]->post_line: {post_line}')
+                        post_message = DiscordMessage(
+                            content=post_line,
+                            files=processing_message_attachments, # Processing attachments are passed to the post message
+                        )
+                        waiting_processing_stack.append(post_message)
+                    
+                    # Create discord message of inline formula
+                    inline_formulas = set(re.findall(inline_pattern, line_with_formula))
+                    print(f'[Deb]->inline_formulas: {inline_formulas}')
+                    if inline_formulas:
+                        # Modify the text to replace the inline formula with latex style
+                        modified_line = line_with_formula
+                        for original_formula in inline_formulas:
+                            modified_formula = original_formula.replace("\\(", "$").replace("\\)", "$")
+                            modified_line = modified_line.replace(original_formula, modified_formula)
+                        print(f'[Deb]->modified_line: {modified_line}')
+                        # Convert the modified text to the image to display in Discord
+                        plt.figure(figsize=(1, 1))
+                        plt.text(0.01, 0.99,  modified_line, wrap=True, fontsize=18, ha='left', va='top', color='white')
+                        plt.axis('off')
+                        pseudo_file = BytesIO()
+                        plt.savefig(
+                            pseudo_file,
+                            format='png',
+                            transparent=True,
+                            pad_inches=0.1,
+                            bbox_inches='tight',
+                        )
+                        plt.clf()
+                        pseudo_file.seek(0)
+                        inline_formula_image = File(fp=pseudo_file, filename="message.png")
+                        # Create the discord message of the inline formula
+                        inline_formula_message = DiscordMessage(
+                            content="",
+                            files=[inline_formula_image],
+                        )
+                        waiting_processing_stack.append(inline_formula_message)
+                    # Create the discord message of line before inline formula
+                    if pre_line:
+                        print(f'[Deb]->pre_line: {pre_line}')
+                        post_message = DiscordMessage(
+                            content=pre_line,
+                            files=processing_message_attachments, # Processing attachments are passed to the post message
+                        )
+                        waiting_processing_stack.append(post_message)
+                    continue
 
             # If there is nothing to process, add the message to the rendered list
             rendered.append(processing_message)

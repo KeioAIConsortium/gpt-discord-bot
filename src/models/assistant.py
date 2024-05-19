@@ -20,7 +20,7 @@ class AssistantCreate:
     description: str | None = None
     instructions: str | None = None
     tools: list[dict[str, Any]] | None = None
-    file_ids: list[str] | None = None
+    tool_resources: dict[str, dict[str, list[str]]] | None = None
     metadata: dict[str, str] | None = None
 
     def input_to_api_create(self) -> dict[str, str]:
@@ -38,8 +38,7 @@ class Assistant(BaseModel):
     model: str | None = None
     instructions: str | None = None
     tools: list[dict[str, Any]] | None = None
-    file_ids: list[str] | None = None
-    metadata: dict[str, str] | None = None
+    tool_resources: dict[str, dict[str, list[str|None]]|None] | None = None
 
     def input_to_api_update(self) -> dict[str, str]:
         """Convert the Assistant object to dict for input to API update"""
@@ -63,9 +62,15 @@ class Assistant(BaseModel):
         - Convert the OpenAIAssistant object to dict
         - Remove the key "object" from the dict
         """
-        data = api_output.model_dump(exclude={"object"})
+        data = api_output.model_dump(exclude={
+            "object",
+            "top_p",
+            "tempreture", 
+            "metadata",
+            "response_format",
+        })
         
-        # Convert the 'tools' filed to a list of dict
+        # Convert the 'tools' to a list of dict
         if 'tools' in data:
             data['tools'] = json.loads(json.dumps(data['tools']))
 
