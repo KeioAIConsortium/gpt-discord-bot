@@ -85,10 +85,10 @@ class Chat(commands.Cog):
             assistants = await search_assistants(search=search)
             for assistant in assistants:
                 view.selectMenu.add_option(
-                    label=assistant.name,
+                    label=assistant.name if assistant.name is not None else "Unknown",
                     value=assistant.id,
                     description=assistant.description[0:min([100,
-                            len(assistant.description)])],
+                            len(assistant.description)])] if assistant.description is not None else "No description",
                 )
             await thread.send("Select your assistant", view=view)
 
@@ -172,6 +172,24 @@ class Chat(commands.Cog):
                         )
                         file_id = await upload_file(file=pseudo_file)
                         file_ids.append(file_id)
+                
+                # Create attachments for the message
+                # If you want to control the tools used for each attachment, 
+                # you should arrange to add a tools key to the attachment
+                attachments = None
+                if file_ids:
+                    attatchments = list(
+                        map(
+                            lambda file_id: {
+                                "file_id": file_id,
+                                "tools": [
+                                    {"type": "file_search"},
+                                    {"type": "code_interpreter"},
+                                ],
+                            },
+                            file_ids,
+                        )
+                    )
 
                 # Generate the response
                 response_data = await generate_response(
@@ -181,7 +199,7 @@ class Chat(commands.Cog):
                         thread_id=openai_thread_id,
                         author_name=message.author.display_name,
                         message=message.content,
-                        file_ids=file_ids,
+                        attachments=attachments,
                     ),
                 )
 
@@ -216,11 +234,12 @@ class SelectView(View):
         await int.response.edit_message(view=self)
 
         # modify the starter embed in the thread
-        embed = self.thread.starter_message.embeds[0]
+        starter_message = await self.thread.parent.fetch_message(self.thread.id)
+        embed = starter_message.embeds[0]
         embed.set_field_at(-2, name="assistant_id", value=selected)
         assistant = await get_assistant(selected)
         embed.set_field_at(-1, name="name", value=assistant.name)
-        await self.thread.starter_message.edit(embed=embed)
+        await starter_message.edit(embed=embed)
 
 class FunctionSelectView(View):
     def __init__(self, *, thread: discord.Thread = None):
