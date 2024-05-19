@@ -70,7 +70,7 @@ The bot operates via slash commands. Type `/` in a text channel to view availabl
 - **`/chat`**: Starts a conversation in a thread. Each new user message is sent as a separate input to the OpenAI API. Users can select an assistant for the chat.
 
 **Note**:
-In this bot, users are distinguished by inputting their messages in the format `username: message`. Therefore, when including custom formats in the system prompt, please keep this in mind and use the format `username: ○○: △△`.
+In this bot, users are distinguished by inputting their messages in the format `username: message`. Therefore, when including custom formats in the system prompt, please keep this in mind and use the format `username: ○○: ××`.
 
 
 # Acknowledgements
