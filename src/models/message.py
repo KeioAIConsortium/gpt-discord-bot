@@ -24,7 +24,9 @@ import matplotlib
 import shutil
 from collections import deque
 import os
-import json
+# from openai.types.beta.threads.text_content_block_param import TextContentBlockParam
+# from openai.types.beta.threads.image_url_content_block_param import ImageURLContentBlockParam
+# from openai.types.beta.threads.image_file_content_block_param import ImageFileContentBlockParam
 
 logger = logging.getLogger(__name__)
 
@@ -65,21 +67,37 @@ class DiscordMessage:
 @dataclass
 class MessageCreate:
     thread_id: str
-    content: str
+    content: str | List[dict[str, ContentText|str] | dict[str, ContentImageFile|str]]
     role: str = "user"
     attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
     metadata: dict[str, str] | None = None
 
     @classmethod
     def from_discord_message(
-        self, thread_id: str, author_name: str, message: str, attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
+        self, thread_id: str, author_name: str, message: str, image_ids: list[str], attachments: list[dict[str, str|list[dict[str, str]]]] | None = None
     ) -> MessageCreate:
         """Create an instance from the discord message"""
-        content = f"{author_name}: {message}"
+        message = f"{author_name}: {message}"
+        content = [
+            {
+                "image_file" : 
+                    {
+                        "file_id" : image_id,
+                        "detail" : "auto"
+                    },
+                "type" : "image_file"
+            } for image_id in image_ids
+        ] if image_ids else []
+        content.append({
+            "text" : message,
+            "type" : "text"
+        })
         return self(thread_id=thread_id, content=content, attachments=attachments)
 
     def input_to_api_create(self) -> dict[str, str]:
         """Convert the MessageCreate object to dict for input to API create"""
+        dict = asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
+        print("[Deb]->MessageCreate: ", dict)
         return asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
 
 
@@ -197,60 +215,61 @@ class ContentText:
             
             # Process the display formula
             # TODO: Detect `$$` pattern
-            display_pattern = r'\\\[([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?)\\\]'
-            display_match = re.search(display_pattern, processing_text, re.DOTALL)
-            if display_match:
-                # Get the formula and the text before and after the formula
-                pre_text = processing_text[:display_match.start()]
-                formula = display_match.group(1)
-                post_text = processing_text[display_match.end():]
+            if False:
+                display_pattern = r'\\\[([\w\s\^_.,=+\-*/{}\[\]()<>!&#:;\|\'\\]+?)\\\]'
+                display_match = re.search(display_pattern, processing_text, re.DOTALL)
+                if display_match:
+                    # Get the formula and the text before and after the formula
+                    pre_text = processing_text[:display_match.start()]
+                    formula = display_match.group(1)
+                    post_text = processing_text[display_match.end():]
 
-                # Process the message from back to front to keep the order in the stack
-                # Create discord message of text after the formula
-                if post_text:
-                    print(f'[Deb]->post_text: {post_text}')
-                    post_message = DiscordMessage(
-                        content=post_text,
-                        files=processing_message_attachments, # Processing attachments are passed to the post message
-                    )
-                    waiting_processing_stack.append(post_message)
-                
-                # Create discord message of the formula
-                if formula:
-                    print(f'[Deb]->formula: {formula}')
-                    # Convert the formula to latex style
-                    formula = re.sub(r'[\n\t]', '', formula)
-                    formula = '$' + formula + '$'
-                    # Convert the latex style formula to image
-                    plt.figure(figsize=(1, 1))
-                    plt.text(0.5, 0.5, formula, fontsize=24, ha='center', va='center', color='white')
-                    plt.axis('off')
-                    pseudo_file = BytesIO()
-                    plt.savefig(
-                        pseudo_file,
-                        format='png',
-                        transparent=True,
-                        bbox_inches='tight',
-                        pad_inches=0
-                    )
-                    plt.clf()
-                    pseudo_file.seek(0)
-                    formula_image = File(fp=pseudo_file, filename="formula.png")
-                    formula_message = DiscordMessage(
-                        content="",
-                        files=[formula_image],
-                    )
-                    waiting_processing_stack.append(formula_message)
-                # Create discord message of text before the formula
-                if pre_text:
-                    print(f'[Deb]->pre_text: {pre_text}')
-                    pre_message = DiscordMessage(
-                        content=pre_text,
-                        files=[],
-                    )
-                    waiting_processing_stack.append(pre_message)
-                # Continue the loop to process the message in step by step
-                continue
+                    # Process the message from back to front to keep the order in the stack
+                    # Create discord message of text after the formula
+                    if post_text:
+                        print(f'[Deb]->post_text: {post_text}')
+                        post_message = DiscordMessage(
+                            content=post_text,
+                            files=processing_message_attachments, # Processing attachments are passed to the post message
+                        )
+                        waiting_processing_stack.append(post_message)
+                    
+                    # Create discord message of the formula
+                    if formula:
+                        print(f'[Deb]->formula: {formula}')
+                        # Convert the formula to latex style
+                        formula = re.sub(r'[\n\t]', '', formula)
+                        formula = '$' + formula + '$'
+                        # Convert the latex style formula to image
+                        plt.figure(figsize=(1, 1))
+                        plt.text(0.5, 0.5, formula, fontsize=24, ha='center', va='center', color='white')
+                        plt.axis('off')
+                        pseudo_file = BytesIO()
+                        plt.savefig(
+                            pseudo_file,
+                            format='png',
+                            transparent=True,
+                            bbox_inches='tight',
+                            pad_inches=0
+                        )
+                        plt.clf()
+                        pseudo_file.seek(0)
+                        formula_image = File(fp=pseudo_file, filename="formula.png")
+                        formula_message = DiscordMessage(
+                            content="",
+                            files=[formula_image],
+                        )
+                        waiting_processing_stack.append(formula_message)
+                    # Create discord message of text before the formula
+                    if pre_text:
+                        print(f'[Deb]->pre_text: {pre_text}')
+                        pre_message = DiscordMessage(
+                            content=pre_text,
+                            files=[],
+                        )
+                        waiting_processing_stack.append(pre_message)
+                    # Continue the loop to process the message in step by step
+                    continue
 
             if process_inline_formula:
                 # Process the inline formula
