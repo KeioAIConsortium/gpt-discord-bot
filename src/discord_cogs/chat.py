@@ -26,6 +26,8 @@ from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
+IMAGE_FILE_EXTENSION = [".jpeg", ".jpg", ".gif", ".png", ".webp"]
+
 FILE_SEARCH_EXTENSION = [
     ".c", ".cs", ".cpp", ".doc", ".docx", ".html", ".java", ".json", 
     ".md", ".pdf", ".php", ".pptx", ".py", ".rb", ".tex", ".txt", 
@@ -171,12 +173,24 @@ class Chat(commands.Cog):
                                 
                 # Add the files to the thread when message has attachments
                 # TODO: Error handling when len(message.attachments) > 10 or size > 512MB
-                # TODO: Restrict file types
+                image_ids = list()
                 attachments = None
                 if message.attachments:
+                    image_ids = list()
                     attachments = list()
                     for attachment in message.attachments:
                         # Handle the attachment
+                        # For Image files
+                        if os.path.splitext(attachment.filename)[1] in IMAGE_FILE_EXTENSION:
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
+                            image_id = await upload_file(file=pseudo_file, purpose="vision")
+                            image_ids.append(image_id)
+                        
+                        # For Tools
                         if (os.path.splitext(attachment.filename)[1] in FILE_SEARCH_EXTENSION 
                             or os.path.splitext(attachment.filename)[1] in CODE_INTERPRETER_EXTENSION):
                             pseudo_file = ( 
@@ -203,6 +217,7 @@ class Chat(commands.Cog):
                         thread_id=openai_thread_id,
                         author_name=message.author.display_name,
                         message=message.content,
+                        image_ids=image_ids,
                         attachments=attachments,
                     ),
                 )
