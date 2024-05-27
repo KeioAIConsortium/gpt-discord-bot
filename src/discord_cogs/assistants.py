@@ -302,6 +302,41 @@ class Assistant(commands.Cog):
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click. Code interpreter was disabled.")
             
+            # Function Calling
+            function_calling_view = TrueFalseView()
+            await thread.send("# Function Calling", view=function_calling_view)
+            function_calling_value = False
+            try:
+                function_calling_value = await asyncio.wait_for(function_calling_view.value, timeout=180)
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+
+            if function_calling_value:
+                view = FunctionSelectView(thread=thread)
+                available_functions = get_available_functions()
+
+                for func in available_functions:
+                    view.selectMenu.add_option(
+                        label=func["function"]["name"],
+                        value=func["function"]["name"],
+                        description=func["function"]["description"][0:min([100, len(func["function"]["description"])])],
+                    )
+
+                await thread.send("Select the function:", view=view)
+
+                try:
+                    await asyncio.wait_for(view.wait(), timeout=180)
+                    if view.selected_function:
+                        func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
+                        if func:
+                            function_tool_dict = function_tool_to_dict(func)
+                            tools.append(function_tool_dict)
+                            await thread.send("Function was added to the assistant.")
+                    else:
+                        await thread.send("No function was added to the assistant.")
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for function selection. No function was added to the assistant.")
+
             assistant.tools = tools # Update tools
             
             # Add file_ids to the assistant only if file retrieval or code interpreter is enabled
