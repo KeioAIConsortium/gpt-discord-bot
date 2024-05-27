@@ -20,6 +20,8 @@ from src.discord_cogs._utils import (
     split_into_shorter_messages,
 )
 from src.models.assistant import AssistantCreate
+from src.models.message import function_tool_to_dict
+from src.discord_cogs.chat import FunctionSelectView
 from src.openai_api.assistants import (
     create_assistant,
     delete_assistant,
@@ -27,7 +29,12 @@ from src.openai_api.assistants import (
     list_assistants,
     update_assistant,
 )
-from src.openai_api.files import upload_file
+from src.openai_api.files import (
+    upload_file,
+    create_vector_store,
+    update_vector_store,
+)
+from src.openai_api.function_tools import get_available_functions
 
 logger = logging.getLogger(__name__)
 
@@ -79,21 +86,21 @@ class Assistant(commands.Cog):
             tools = []
             await thread.send("What are the tools for your assistant?")
 
-            # File retrieval
+            # File search
             retrieval_view = TrueFalseView()
-            await thread.send("# Files", view=retrieval_view)
+            await thread.send("# File Search", view=retrieval_view)
             retrieval_value = False
             try:
                 retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
                 if retrieval_value:
-                    tools.append({"type": "retrieval"})
+                    tools.append({"type": "file_search"})
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click")
 
             # Code interpreter
             code_interpreter_view = TrueFalseView()
             await thread.send(
-                "# Code Interpreter\n**NOTE :** It should also be enabled if you need to handle file types other than .txt.", 
+                "# Code Interpreter", 
                 view=code_interpreter_view
             )
             code_interpreter_value = False
@@ -103,11 +110,46 @@ class Assistant(commands.Cog):
                     tools.append({"type": "code_interpreter"})
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click")
+            
+            # Function Calling
+            # TODO: fix function selection
+            function_calling_view = TrueFalseView()
+            await thread.send("# Function Calling", view=function_calling_view)
+            function_calling_value = False
+            try:
+                function_calling_value = await asyncio.wait_for(function_calling_view.value, timeout=180)
+            except asyncio.TimeoutError:
+                await thread.send("Timed out waiting for button click")
+                
+            if function_calling_value:
+                view = FunctionSelectView(thread=thread)
+                available_functions = get_available_functions()
+                
+                for func in available_functions:
+                    view.selectMenu.add_option(
+                        label=func["function"]["name"],
+                        value=func["function"]["name"],
+                        description=func["function"]["description"][0:min([100, len(func["function"]["description"])])],
+                    )
 
-            # File ids                
-            file_ids = [] # Default value
-
-            # Add files to the assistant if file retrieval or code interpreter is enabled
+                await thread.send("Select the function:", view=view)
+            
+                try:
+                    await asyncio.wait_for(view.wait(), timeout=180)
+                    if view.selected_function:
+                        func = next((f for f in available_functions if f["function"]["name"] == view.selected_function), None)
+                        if func:
+                            function_tool_dict = function_tool_to_dict(func)
+                            tools.append(function_tool_dict)
+                            await thread.send("Function was added to the assistant.")
+                    else:
+                        await thread.send("No function was added to the assistant.")
+                except asyncio.TimeoutError:
+                    await thread.send("Timed out waiting for function selection. No function was added to the assistant.")
+            
+            # File ids
+            file_ids = list() # Default value
+            # Upload the files if file search or code interpreter is enabled
             if retrieval_value or code_interpreter_value:
                 file_upload_view = YesNoView(
                     {
@@ -139,9 +181,28 @@ class Assistant(commands.Cog):
                                 attachment.content_type
                             )
                             file_id = await upload_file(file=pseudo_file)
-                            file_ids.append(file_id) 
+                            file_ids.append(file_id)
             else:
-                file_ids = [] # Reset file_ids
+                file_ids = list() # Reset file_ids
+
+            # Create Tool Resources if files are uploaded
+            tool_resources = None
+            if file_ids:
+                tool_resources = dict()
+                if retrieval_value:
+                    tool_resources["file_search"] = dict(
+                        vector_store_ids=list()
+                    )
+                    vector_store_name = f"{name} - Vector Store"
+                    vector_store_id = await create_vector_store(
+                        name=vector_store_name, 
+                        file_ids=file_ids
+                    )
+                    tool_resources["file_search"]["vector_store_ids"].append(vector_store_id)
+                if code_interpreter_value:
+                    tool_resources["code_interpreter"] = dict(
+                        file_ids=file_ids
+                    )
 
             # Create the assistant
             created = await create_assistant(
@@ -150,7 +211,7 @@ class Assistant(commands.Cog):
                     description=description.content,
                     instructions=instructions.content,
                     tools=tools,
-                    file_ids=file_ids,
+                    tool_resources=tool_resources
                 )
             )
 
@@ -218,19 +279,19 @@ class Assistant(commands.Cog):
 
             # File retrieval
             retrieval_view = TrueFalseView()
-            await thread.send("# Files", view=retrieval_view)
+            await thread.send("# Files Search", view=retrieval_view)
             retrieval_value = False
             try:
                 retrieval_value = await asyncio.wait_for(retrieval_view.value, timeout=180)
                 if retrieval_value:
-                    tools.append({"type": "retrieval"})
+                    tools.append({"type": "file_search"})
             except asyncio.TimeoutError:
                 await thread.send("Timed out waiting for button click. Files was disabled.")
 
             # Code interpreter
             code_interpreter_view = TrueFalseView()
             await thread.send(
-                "# Code Interpreter\n**NOTE :** It should also be enabled if you need to handle file types other than .txt.", 
+                "# Code Interpreter", 
                 view=code_interpreter_view
             )
             code_interpreter_value = False
@@ -264,9 +325,12 @@ class Assistant(commands.Cog):
                     await thread.send("Timed out waiting for button click. The existing files were not removed.")
                 
                 if keep_files_value:
-                    file_ids = assistant.file_ids # Keep the existing file_ids
+                    tool_resources = assistant.tool_resources
                 else:
-                    file_ids = [] # Reset file_ids
+                    tool_resources = dict(
+                        file_search=None,
+                        code_interpreter=None
+                    )
                 
                 # Ask the user if they want to add more files
                 file_upload_view = YesNoView(
@@ -297,13 +361,35 @@ class Assistant(commands.Cog):
                                 await attachment.read(), 
                                 attachment.content_type
                             )
-                            file_id = await upload_file(file=pseudo_file)
-                            file_ids.append(file_id)
+                            if retrieval_value:
+                                if tool_resources["file_search"] is None:
+                                    tool_resources["file_search"] = dict(
+                                        vector_store_ids=list()
+                                    )
+                                    tool_resources["file_search"]["vector_store_ids"].append(
+                                        await create_vector_store(
+                                            name=f"{assistant.name} - Vector Store"
+                                        )
+                                    )
+                                else:
+                                    vector_store_id = tool_resources["file_search"]["vector_store_ids"][-1]
+                                    _ = await update_vector_store(vector_store_id, pseudo_file)
+                                
+                            if code_interpreter_value:
+                                if tool_resources["code_interpreter"] is None:
+                                    tool_resources["code_interpreter"] = dict(
+                                        file_ids=list()
+                                    )
+                                file_id = await upload_file(file=pseudo_file)
+                                tool_resources["code_interpreter"]["file_ids"].append(file_id)
             
-                assistant.file_ids = file_ids # Update file_ids
+                assistant.tool_resources = tool_resources # Update tool_resources
             else:
                 # Remove all file_ids if file retrieval and code interpreter are disabled
-                assistant.file_ids = []
+                assistant.tool_resources = dict(
+                    file_search=None,
+                    code_interpreter=None
+                )
 
             # Update the assistant
             updated = await update_assistant(assistant)
@@ -323,7 +409,7 @@ class Assistant(commands.Cog):
         s += f"Description: {assistant.description}\n"
         s += f"Instructions: {assistant.instructions}\n"
         s += f"Tools: {assistant.tools}\n"
-        s += f"Files: {assistant.file_ids}```"
+        s += f"ToolResources: {assistant.tool_resources}```"
         responses = split_into_shorter_messages(s)
         for response in responses:
             if len(response) > 0:

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from io import BytesIO
+import os
 
 import logging
+import asyncio
 
 import discord
 from discord import Message as DiscordMessage
@@ -25,6 +26,19 @@ from src.openai_api.files import upload_file
 
 logger = logging.getLogger(__name__)
 
+IMAGE_FILE_EXTENSION = [".jpeg", ".jpg", ".gif", ".png", ".webp"]
+
+FILE_SEARCH_EXTENSION = [
+    ".c", ".cs", ".cpp", ".doc", ".docx", ".html", ".java", ".json", 
+    ".md", ".pdf", ".php", ".pptx", ".py", ".rb", ".tex", ".txt", 
+    ".css", ".js", ".sh", ".ts"
+]
+CODE_INTERPRETER_EXTENSION = [
+    ".c", ".cs", ".cpp", ".doc", ".docx", ".html", ".java", ".json", 
+    ".md", ".pdf", ".php", ".pptx", ".py", ".rb", ".tex", ".txt", 
+    ".css", ".js", ".sh", ".ts", ".csv", ".jpeg", ".jpg", ".gif", 
+    ".png", ".tar", ".xlsx", ".xml", ".zip"
+]
 
 class Chat(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -84,10 +98,10 @@ class Chat(commands.Cog):
             assistants = await search_assistants(search=search)
             for assistant in assistants:
                 view.selectMenu.add_option(
-                    label=assistant.name,
+                    label=assistant.name if assistant.name is not None else "Unknown",
                     value=assistant.id,
                     description=assistant.description[0:min([100,
-                            len(assistant.description)])],
+                            len(assistant.description)])] if assistant.description is not None else "No description",
                 )
             await thread.send("Select your assistant", view=view)
 
@@ -144,8 +158,9 @@ class Chat(commands.Cog):
             # Handle the message in the thread
             async with thread.typing():
                 # get field of embed in the first message of thread
-                openai_thread_id = thread.starter_message.embeds[0].fields[0].value
-                openai_assistant_id = thread.starter_message.embeds[0].fields[1].value
+                first_message = await thread.parent.fetch_message(thread.id)
+                openai_thread_id = first_message.embeds[0].fields[0].value
+                openai_assistant_id = first_message.embeds[0].fields[1].value
                 # TODO: appropriate error handling
                 if openai_assistant_id == "Not selected":
                     await thread.send(
@@ -158,18 +173,41 @@ class Chat(commands.Cog):
                                 
                 # Add the files to the thread when message has attachments
                 # TODO: Error handling when len(message.attachments) > 10 or size > 512MB
-                # TODO: Restrict file types
-                file_ids = []
+                image_ids = list()
+                attachments = None
                 if message.attachments:
+                    image_ids = list()
+                    attachments = list()
                     for attachment in message.attachments:
                         # Handle the attachment
-                        pseudo_file = ( 
-                            attachment.filename, 
-                            await attachment.read(), 
-                            attachment.content_type
-                        )
-                        file_id = await upload_file(file=pseudo_file)
-                        file_ids.append(file_id)
+                        # For Image files
+                        if os.path.splitext(attachment.filename)[1] in IMAGE_FILE_EXTENSION:
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
+                            image_id = await upload_file(file=pseudo_file, purpose="vision")
+                            image_ids.append(image_id)
+                        
+                        # For Tools
+                        if (os.path.splitext(attachment.filename)[1] in FILE_SEARCH_EXTENSION 
+                            or os.path.splitext(attachment.filename)[1] in CODE_INTERPRETER_EXTENSION):
+                            pseudo_file = ( 
+                                attachment.filename, 
+                                await attachment.read(), 
+                                attachment.content_type
+                            )
+                            file_id = await upload_file(file=pseudo_file)
+                            attachment_obj = {
+                                "file_id": file_id,
+                                "tools": [],
+                            }
+                            if os.path.splitext(attachment.filename)[1] in FILE_SEARCH_EXTENSION:
+                                attachment_obj["tools"].append({"type": "file_search"})
+                            if os.path.splitext(attachment.filename)[1] in CODE_INTERPRETER_EXTENSION:
+                                attachment_obj["tools"].append({"type": "code_interpreter"})
+                            attachments.append(attachment_obj)
 
                 # Generate the response
                 response_data = await generate_response(
@@ -179,7 +217,8 @@ class Chat(commands.Cog):
                         thread_id=openai_thread_id,
                         author_name=message.author.display_name,
                         message=message.content,
-                        file_ids=file_ids,
+                        image_ids=image_ids,
+                        attachments=attachments,
                     ),
                 )
 
@@ -214,12 +253,36 @@ class SelectView(View):
         await int.response.edit_message(view=self)
 
         # modify the starter embed in the thread
-        embed = self.thread.starter_message.embeds[0]
+        starter_message = await self.thread.parent.fetch_message(self.thread.id)
+        embed = starter_message.embeds[0]
         embed.set_field_at(-2, name="assistant_id", value=selected)
         assistant = await get_assistant(selected)
         embed.set_field_at(-1, name="name", value=assistant.name)
-        await self.thread.starter_message.edit(embed=embed)
+        await starter_message.edit(embed=embed)
 
+class FunctionSelectView(View):
+    def __init__(self, *, thread: discord.Thread = None):
+        super().__init__()
+        self.thread = thread
+        self.event = asyncio
+        self.selected_function = None
+        
+    @discord.ui.select(cls=Select, placeholder="Not selected")
+    async def selectMenu(self, int: discord.Interaction, select: Select):
+        self.selected_function = select.values[0]
+        for option in select.options:
+            if option.value == self.selected_function:
+                option.default = True
+                break
+
+        select.disabled = True
+        await int.response.edit_message(view=self)
+
+        # modify the starter embed in the thread
+        embed = self.thread.starter_message.embeds[0]
+        embed.add_field(name="selected_function", value=self.selected_function)
+        await self.thread.starter_message.edit(embed=embed)
+        self.stop()
 
 # TODO: remove unused args
 async def process_response(thread: discord.Thread, response_data: ResponseData) -> None:
