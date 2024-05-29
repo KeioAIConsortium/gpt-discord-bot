@@ -3,5 +3,4 @@ python-dotenv==0.21.*
 openai==1.30.*
 PyYAML==6.0
 dacite==1.6.*
-matplotlib==3.8.*
 mediawikiapi==1.2.*
