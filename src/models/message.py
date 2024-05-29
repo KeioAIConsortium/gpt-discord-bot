@@ -16,37 +16,12 @@ from src.openai_api.files import get_image_file
 
 from io import BytesIO
 import re
-from matplotlib import (
-    pyplot as plt,
-    font_manager,
-)
-import matplotlib
-import shutil
-from collections import deque
-import os
+
 # from openai.types.beta.threads.text_content_block_param import TextContentBlockParam
 # from openai.types.beta.threads.image_url_content_block_param import ImageURLContentBlockParam
 # from openai.types.beta.threads.image_file_content_block_param import ImageFileContentBlockParam
 
 logger = logging.getLogger(__name__)
-
-# Set the font to use in matplotlib
-# TODO: Install Latex Engine
-font_name = os.getenv('LATEX_FONT', 'DejaVu Sans')
-# Check if the font is available
-available_fonts = [f.name for f in font_manager.fontManager.ttflist]
-if font_name in available_fonts:
-    # Set the font
-    plt.rcParams['font.family'] = font_name
-    print(f"Font '{font_name}' is found and set successfully.")
-else:
-    # Remove the cache file to avoid the error
-    shutil.rmtree(matplotlib.get_cachedir())
-    print("The font cannnot be loaded. Please try again after install it.")
-    print("If it is installed, this error may be caused by cache file and it was removed now.")
-    print("Please excute this program again.")
-
-process_inline_formula = False # os.getenv('PROCESS_INLINE_FORMULA', 'False').lower() == 'true'
 
 @dataclass
 class DiscordMessage:
